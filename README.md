@@ -4,7 +4,9 @@ A multiplayer mod for Shadow Fight 2. Two players fight each other on one PC, or
 device over the network. It runs on **PC, Android and iPhone**.
 
 The game you play is the **web version of Shadow Fight 2**, patched by this mod. It plays in a browser
-(PC, iPhone) or in the mod's Android app. The game’s own fights against the AI are still there as usual. The mod’s match menu adds free fights: any character against any other, played by a person or the AI.
+(PC, iPhone) or in the mod's Android app. The game's own fights against the AI are still there as
+usual. The mod's match menu adds free fights: any character against any other, played by a person or
+the AI.
 
 **This repository contains no game files.** The mod is built from your own copy of the web version,
 which comes with the Microsoft Store app on Windows. This project is not affiliated with or endorsed by
@@ -49,19 +51,22 @@ Open http://localhost:8080/ in Chrome or Edge. The menu has:
 - **Two players, network**: each on their own device
 - **Normal game**: the game as it is, with its own save
 
-### Other devices (phones, tablets, other PCs)
+### Sharing the game with other devices
 
-```
-python server.py C:\sf2\out --share
-```
+A PC or an Android phone with the app can share the game. Other devices on the same network (phones,
+tablets, iPhones, other PCs) then open it in their browser; they need nothing installed. No internet
+is needed: a phone's hotspot is enough.
 
-Other devices on the same network open `http://<this PC's IP>:8080/`. Windows may ask to let Python
-through the firewall.
+- **From a PC:** `python server.py C:\sf2\out --share`, then the others open
+  `http://<this PC's IP>:8080/`. Windows may ask to let Python through the firewall.
+- **From the Android app:** **Two players, network > Share the game**. The app shows the address the
+  others open. Keep the app open while they play.
 
 ### Two players on two devices
 
 One player chooses **Two players, network > Create match**. The other enters the host's address
-and joins. Only the inputs travel; both devices run the same simulation.
+and joins. The host can be a PC, the Android app, or a device that opened a shared game (its match
+then runs through the sharing device). Only the inputs travel; both devices run the same simulation.
 
 ## Android app (optional)
 
