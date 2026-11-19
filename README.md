@@ -3,8 +3,7 @@
 A multiplayer mod for Shadow Fight 2. Two players fight each other on one PC, or each on their own
 device over the network. It runs on **PC, Android and iPhone**.
 
-The game you play is the **web version of Shadow Fight 2**, patched by this mod. It plays in a browser
-(PC, iPhone) or in the mod's Android app. The game's own fights against the AI are still there as
+The game you play is the **web version of Shadow Fight 2**, patched by this mod. It plays in a browser or in the mod's Android app. The game's own fights against the AI are still there as
 usual. The mod's match menu adds free fights: any character against any other, played by a person or
 the AI.
 
