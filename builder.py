@@ -2792,9 +2792,10 @@ def zip_aligned(zf, name, data, store):
 
 def build_apk(out, apk):
     shell = os.path.join(ANDROID, "sf2_shell.apk")
-    if not os.path.exists(shell):
-        sys.exit(f"--apk: {shell} not found (it comes with builder.py)")
     signer = os.path.join(ANDROID, "apksigner.jar")
+    for f in (shell, signer):
+        if not os.path.exists(f):
+            sys.exit(f"--apk: {f} not found - the android folder must sit next to builder.py, as it comes")
     java, keytool = java_tool("java"), java_tool("keytool")
     ks = os.path.join(ANDROID, "sf2.keystore")
     if not os.path.exists(ks):     # once: every later APK must carry the same key (see the notes)

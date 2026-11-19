@@ -1,6 +1,6 @@
 # Third-party notices
 
-The Release files contain code from other projects:
+Files in `android/` contain code from other projects:
 
 - `apksigner.jar`: Android SDK build-tools, Copyright The Android Open Source Project,
   Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)

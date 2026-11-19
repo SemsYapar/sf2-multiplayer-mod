@@ -4,10 +4,10 @@ out/
 *_out/
 android_*/
 *.apk
+!android/sf2_shell.apk
 *.xapk
 # private keys
 *.keystore
-android/apksigner.jar
 # not part of the public tool
 android.py
 __pycache__/

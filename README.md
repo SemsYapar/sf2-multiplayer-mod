@@ -3,7 +3,8 @@
 A multiplayer mod for Shadow Fight 2. Two players fight each other on one PC, or each on their own
 device over the network. It runs on **PC, Android and iPhone**.
 
-The game you play is the **web version of Shadow Fight 2**, patched by this mod. It plays in a browser or in the mod's Android app. The game's own fights against the AI are still there as
+The game you play is the **web version of Shadow Fight 2**, patched by this mod. It plays in a browser
+(PC, iPhone) or in the mod's Android app. The game's own fights against the AI are still there as
 usual. The mod's match menu adds free fights: any character against any other, played by a person or
 the AI.
 
@@ -69,14 +70,14 @@ then runs through the sharing device). Only the inputs travel; both devices run 
 
 ## Android app (optional)
 
-Download `sf2_shell.apk` and `apksigner.jar` from the Releases page into `android/`, then:
-
 ```
 python builder.py C:\sf2\out --apk
 ```
 
-The first run creates a signing key `android/sf2.keystore`. Keep it, and never upload it: an app signed
-with another key does not install over the old one. The app's source is in `android/project`.
+The app's files are in `android/`: `sf2_shell.apk` (the app without the game), `apksigner.jar`
+(Google's signing tool) and the app's source in `android/project`. The first run creates a signing key
+`android/sf2.keystore`. Keep it, and never upload it: an app signed with another key does not install
+over the old one.
 
 ## Command reference
 
