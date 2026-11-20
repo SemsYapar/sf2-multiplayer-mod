@@ -516,7 +516,8 @@ function __sf2LookFrame(){var A=window.__sf2API,z=A&&A.za&&A.za.instance,f=A&&A.
   __sf2LookOn=!!__sf2Look;__sf2LookOn&&requestAnimationFrame(__sf2LookFrame)}
 // the game behind the menu (over the dojo, after a Try): stopped - no frames, no sound
 function __sf2Pause(on){var I=window.__sf2API&&__sf2API.J&&__sf2API.J.I;if(!I||!I.Nc)return;
-  if(on){I.gga().KF(!1);I.Nc.stop()}else if(!I.Nc.active){I.gga().KF(!0);I.ed().reset();I.Nc.start()}
+  // the game's own pause for a hidden tab (Kp: loop stopped, sound muted; Np: both back), and no input
+  if(on){I.gga().KF(!1);I.Kp()}else if(!I.Nc.active){I.gga().KF(!0);I.ed().reset();I.Np()}
   on||setTimeout(function(){var A=window.__sf2API;   // a Try that ended: the dojo with the player's gear (none if a new Try began)
     if(__sf2LookReload&&!__sf2Look){__sf2LookReload=false;A.ya.F().Ud.ag==3&&A.ya.F().xp(3)}},0)}
 function __sf2TryUndo(){var A=window.__sf2API,b=sessionStorage.getItem('sf2-try');if(!b||!A||!A.p)return;
@@ -865,6 +866,17 @@ JS_PATCHES = [
     # A move's SetEndStage action (GatekeeperLoss: a ragdoll without animation, so no animation end to end
     # the round's end stage) did nothing: the loser never ended its stage and the next round never started.
     # It now sets the fighter's stage-ended flag, as the end of an EndsStage move does (FIa)
+    # A move's lock <Item Player="Enemy" .../> (TitanThrowForwardV: the victim's half of Titan's throw, unlocked
+    # when the enemy holds the giant sword) was checked against the fighter's own items: Titan got the
+    # victim's move and his victims did not, so his throw grabbed nothing. Player="Enemy" now checks the
+    # enemy's items (jb; none yet: locked)
+    ("item lock on the enemy",
+     r'class ym extends Ha\{constructor\(a\)\{super\(13\);',
+     'class ym extends Ha{constructor(a){super(13);this.__sf2Enemy=a.attributes.get("Player")=="Enemy";'),
+    ("item lock on the enemy (check)",
+     r'\}je\(a\)\{let b=0;for\(a=a\.items;b<a\.length;\)\{var c=a\[b\];\+\+b;var d=void 0;d=this\.QR;',
+     '}je(a){let b=0;for(a=this.__sf2Enemy?a.Cr&&a.Cr.jb?a.Cr.jb.parameters.qp():[]:a.items;b<a.length;)'
+     '{var c=a[b];++b;var d=void 0;d=this.QR;'),
     ("SetEndStage action",
      r'class gm extends fb\{constructor\(a\)\{super\(15\);this\.parse\(a\)\}Zh\(\)\{\}',
      'class gm extends fb{constructor(a){super(15);this.parse(a)}Zh(a){a.DR=!0}'),
@@ -1064,8 +1076,8 @@ var D=window.__SF2MENU,R=window.__SF2DATA,touch=window.matchMedia&&matchMedia('(
 var SLOTS=['Weapon','Ranged','Magic','Helm','Armor'];
 var S={mode:null,type:null,fight:null,eclipse:false,difficulty:'',oppHuman:true,
   p:[{tpl:'Default',super:''},{tpl:'Man_Kungfu',super:'',tactic:'Standard'}],active:0,
-  tab:'boss',weapon:'',q:'',location:'bamboo_grove',rounds:3,time:99,zone:'',ftype:'',fq:''};
-var MENU_KEEP=['mode','type','fight','eclipse','difficulty','oppHuman','p','active','tab','weapon','location','rounds','time','zone','ftype'];
+  tab:'boss',weapon:'',q:'',location:'bamboo_grove',rounds:3,time:99,rules:[],zone:'',ftype:'',fq:''};
+var MENU_KEEP=['mode','type','fight','eclipse','difficulty','oppHuman','p','active','tab','weapon','location','rounds','time','rules','zone','ftype'];
 var css=`
 #sf2m{position:fixed;inset:0;z-index:100000;background:radial-gradient(circle at 50% 0,#3a2a1a,#0b0806 70%);color:#eee;
  font:14px/1.35 system-ui,sans-serif;overflow:auto;-webkit-user-select:none;user-select:none}
@@ -1122,7 +1134,7 @@ function dname(c){return LANG=='tr'&&c.displayTr||c.display}   // a character's 
 function avatar(c,cls){var u=c&&D.avatars[c.avatar];return u?'<img class="'+(cls||'')+'" src="'+u+'" loading="lazy">':'<div class="ph '+(cls||'')+'">'+esc((c&&c.display||'?')[0])+'</div>'}
 var root,body,err='';
 // Turkish on a Turkish device, English elsewhere (the game follows the device language too)
-var TR={"Try": "Dene", "Try it in the dojo": "Dojoda dene", "What they do": "Ne işe yarıyorlar", "no ranged": "fırlatma yok", "no magic": "büyü yok", "no helm": "kask yok", "no armor": "zırh yok", "no weapon": "silah yok", "Normal game": "Normal oyun", "The game as it is, with its own save on this device (export / import it with the \u2630 button). Unlimited energy.": "Oyunun kendisi, bu cihazda kendi kaydıyla (\u2630 butonuyla dışa / içe aktarılır). Enerji sınırsız.", "Play": "Oyna", "With cheats: money and gems": "Hileli: para ve elmas", "Back": "Geri", "Traits": "Özellikler", "Enchantments": "Tılsımlar", "Skeleton": "İskelet", "Heavy": "Ağır", "Gatekeeper": "Bekçi", "Tentacle": "Dokunaçlı", "Normal": "Normal", "its Super wears its own": "Super'i kendi iskeletini takar", "Works only with this armor:": "Sadece bu zırhla çalışır:", "Weapon": "Silah", "Close": "Kapat","Form": "Form", "template": "şablon", "Bosses": "Bosslar", "Underworld": "Yeraltı", "Android extra": "Android ekleri", "phase": "aşama", "Zone": "Bölge","own": "kendi", "others": "diğerleri", "Ability": "Yetenek", "Up when charged": "dolunca Yukarı", "Ability key": "Yetenek tuşu", "Ranged": "Fırlatma", "Magic": "Büyü", "Helm": "Kask", "Armor": "Zırh", "none": "yok","Create match": "Maç kur", "You choose the match and play on the left. Opens this device to the other player.": "Maçı sen seçer, solda oynarsın. Bu cihazı diğer oyuncuya açar.", "You choose the match and play on the left, on the server this page came from:": "Maçı sen seçer, solda oynarsın; bu sayfanın geldiği sunucuda:", "Share the game": "Oyunu paylaş", "Other devices (iPhones too) open the game from this one in their browser, then play through it. This device does not have to play.": "Diğer cihazlar (iPhone da) oyunu bu cihazdan tarayıcılarında açar ve bunun üzerinden oynar. Bu cihazın oynaması gerekmez.", "Game port": "Oyun portu", "Network port": "Ağ portu", "Share": "Paylaş", "Other devices open": "Diğer cihazlar şunu açsın:", "Keep this app open while others play.": "Diğerleri oynarken bu uygulamayı açık tut.","Shadow Fight 2": "Shadow Fight 2", "Single player": "Tek oyuncu", "You against the AI.": "Sen, yapay zekâya karşı.", "Two players, this PC": "İki oyuncu, bu PC", "Both on one keyboard. Not on phones.": "İkiniz bir klavyede. Telefonda yok.", "Two players, network": "İki oyuncu, ağ", "Each on their own device, through a relay server.": "Herkes kendi cihazında, ağ sunucusu üzerinden.", "Host": "Host", "Opens this device to the other player. You choose the match and play on the left.": "Bu cihazı diğer oyuncuya açar. Maçı sen seçersin, solda oynarsın.", "Port": "Port", "Join": "Katıl", "The host chooses the match; you pick your fighter and play on the right.": "Maçı host seçer; sen dövüşçünü seçip sağda oynarsın.", "host address, e.g. 192.168.1.20:8081": "host adresi, ör. 192.168.1.20:8081", "Choose the match": "Maçı seç", "Story fight": "Hikâye dövüşü", "A fight of the game as it is: its opponents, rules and place.": "Oyundaki bir dövüş olduğu gibi: rakipleri, kuralları, mekânı.", "Free fight": "Serbest dövüş", "Pick the fighters, the place and the rules.": "Dövüşçüleri, mekânı ve kuralları seç.", "No balancing (level 52, every item)": "Dengeleme yok (seviye 52, her eşya)", "No balancing (AI as its template)": "Dengeleme yok (yapay zekâ şablonu gibi)", "Very Easy": "Çok kolay", "Easy": "Kolay", "Middle": "Orta", "Hard": "Zor", "Very Hard": "Çok zor", "All zones": "Tüm bölgeler", "All types": "Tüm türler", "search": "ara", "Difficulty": "Zorluk", "The other player plays the opponents": "Rakipleri diğer oyuncu oynar", "You fight as yourself: pick your gear in the dojo, then its fight button starts the fight. Difficulty sets your level so that the game rates the fight that way.": "Kendin olarak dövüşürsün: eşyalarını dojoda seç, dojonun dövüş butonu dövüşü başlatır. Zorluk, oyunun dövüşü öyle değerlendireceği seviyeye seni ayarlar.", "Player 1": "Oyuncu 1", "Player 2": "Oyuncu 2", "Opponent (AI)": "Rakip (yapay zekâ)", "picks on their own device": "kendi cihazında seçiyor", "My own fighter: I pick the gear in the dojo": "Kendi dövüşçüm: eşyaları dojoda seçerim", "Own fighter": "Kendi dövüşçün", "gear from the dojo; the match starts from its fight button": "eşyalar dojodan; maç dojonun dövüş butonuyla başlar", "none": "yok", "Tactic": "Taktik", "Your fighter": "Dövüşçün", "The host chose:": "Host seçti:", "rounds": "raund", "You play on the right.": "Sen sağda oynarsın.", "Place": "Mekân", "Rounds": "Raund", "Seconds": "Saniye", "Bosses": "Bosslar", "Characters": "Karakterler", "Fighters": "Dövüşçüler", "All weapons": "Tüm silahlar", "Random": "Rastgele", "Tap a card for the highlighted player.": "Seçili oyuncu için bir karta dokun.", "What the menu made. Change anything (see the config guide) and start.": "Menünün oluşturduğu maç. İstediğini değiştir ve başlat.", "Fight with this JSON": "Bu JSON ile dövüş", "Fight!": "Dövüş!", "Others join with": "Diğerleri şununla katılır:", "copied": "kopyalandı", "Pick a fight from the list.": "Listeden bir dövüş seç.", "waiting for the other player to pick a fighter ...": "diğer oyuncunun dövüşçü seçmesi bekleniyor ...", "waiting for the host ...": "host bekleniyor ...", "connected - waiting for the host to choose a match ...": "bağlandı - host'un maç seçmesi bekleniyor ...", "connecting to": "bağlanılıyor:", "the network server does not answer": "ağ sunucusu cevap vermiyor", "no host at": "bu adreste host yok:", "(has the host chosen Host yet?)": "(host, Host'a bastı mı?)", "could not open the network server:": "ağ sunucusu açılamadı:", "random": "rastgele"};
+var TR={"Extra perk": "Ekstra perk", "Fighter perks": "Dövüşçü perkleri", "Elixirs": "İksirler", "Fight rules": "Dövüş kuralları", "area": "alan", "Try": "Dene", "Try it in the dojo": "Dojoda dene", "What they do": "Ne işe yarıyorlar", "no ranged": "fırlatma yok", "no magic": "büyü yok", "no helm": "kask yok", "no armor": "zırh yok", "no weapon": "silah yok", "Normal game": "Normal oyun", "The game as it is, with its own save on this device (export / import it with the \u2630 button). Unlimited energy.": "Oyunun kendisi, bu cihazda kendi kaydıyla (\u2630 butonuyla dışa / içe aktarılır). Enerji sınırsız.", "Play": "Oyna", "With cheats: money and gems": "Hileli: para ve elmas", "Back": "Geri", "Traits": "Özellikler", "Enchantments": "Tılsımlar", "Works only with this armor:": "Sadece bu zırhla çalışır:", "Weapon": "Silah", "Close": "Kapat","Form": "Form", "template": "şablon", "Bosses": "Bosslar", "Underworld": "Yeraltı", "Android extra": "Android ekleri", "phase": "aşama", "Zone": "Bölge","own": "kendi", "others": "diğerleri", "Ability": "Yetenek", "Up when charged": "dolunca Yukarı", "Ability key": "Yetenek tuşu", "Ranged": "Fırlatma", "Magic": "Büyü", "Helm": "Kask", "Armor": "Zırh", "none": "yok","Create match": "Maç kur", "You choose the match and play on the left. Opens this device to the other player.": "Maçı sen seçer, solda oynarsın. Bu cihazı diğer oyuncuya açar.", "You choose the match and play on the left, on the server this page came from:": "Maçı sen seçer, solda oynarsın; bu sayfanın geldiği sunucuda:", "Share the game": "Oyunu paylaş", "Other devices (iPhones too) open the game from this one in their browser, then play through it. This device does not have to play.": "Diğer cihazlar (iPhone da) oyunu bu cihazdan tarayıcılarında açar ve bunun üzerinden oynar. Bu cihazın oynaması gerekmez.", "Game port": "Oyun portu", "Network port": "Ağ portu", "Share": "Paylaş", "Other devices open": "Diğer cihazlar şunu açsın:", "Keep this app open while others play.": "Diğerleri oynarken bu uygulamayı açık tut.","Shadow Fight 2": "Shadow Fight 2", "Single player": "Tek oyuncu", "You against the AI.": "Sen, yapay zekâya karşı.", "Two players, this PC": "İki oyuncu, bu PC", "Both on one keyboard. Not on phones.": "İkiniz bir klavyede. Telefonda yok.", "Two players, network": "İki oyuncu, ağ", "Each on their own device, through a relay server.": "Herkes kendi cihazında, ağ sunucusu üzerinden.", "Host": "Host", "Opens this device to the other player. You choose the match and play on the left.": "Bu cihazı diğer oyuncuya açar. Maçı sen seçersin, solda oynarsın.", "Port": "Port", "Join": "Katıl", "The host chooses the match; you pick your fighter and play on the right.": "Maçı host seçer; sen dövüşçünü seçip sağda oynarsın.", "host address, e.g. 192.168.1.20:8081": "host adresi, ör. 192.168.1.20:8081", "Choose the match": "Maçı seç", "Story fight": "Hikâye dövüşü", "A fight of the game as it is: its opponents, rules and place.": "Oyundaki bir dövüş olduğu gibi: rakipleri, kuralları, mekânı.", "Free fight": "Serbest dövüş", "Pick the fighters, the place and the rules.": "Dövüşçüleri, mekânı ve kuralları seç.", "No balancing (level 52, every item)": "Dengeleme yok (seviye 52, her eşya)", "No balancing (AI as its template)": "Dengeleme yok (yapay zekâ şablonu gibi)", "Very Easy": "Çok kolay", "Easy": "Kolay", "Middle": "Orta", "Hard": "Zor", "Very Hard": "Çok zor", "All zones": "Tüm bölgeler", "All types": "Tüm türler", "search": "ara", "Difficulty": "Zorluk", "The other player plays the opponents": "Rakipleri diğer oyuncu oynar", "You fight as yourself: pick your gear in the dojo, then its fight button starts the fight. Difficulty sets your level so that the game rates the fight that way.": "Kendin olarak dövüşürsün: eşyalarını dojoda seç, dojonun dövüş butonu dövüşü başlatır. Zorluk, oyunun dövüşü öyle değerlendireceği seviyeye seni ayarlar.", "Player 1": "Oyuncu 1", "Player 2": "Oyuncu 2", "Opponent (AI)": "Rakip (yapay zekâ)", "picks on their own device": "kendi cihazında seçiyor", "My own fighter: I pick the gear in the dojo": "Kendi dövüşçüm: eşyaları dojoda seçerim", "Own fighter": "Kendi dövüşçün", "gear from the dojo; the match starts from its fight button": "eşyalar dojodan; maç dojonun dövüş butonuyla başlar", "none": "yok", "Tactic": "Taktik", "Your fighter": "Dövüşçün", "The host chose:": "Host seçti:", "rounds": "raund", "You play on the right.": "Sen sağda oynarsın.", "Place": "Mekân", "Rounds": "Raund", "Seconds": "Saniye", "Bosses": "Bosslar", "Characters": "Karakterler", "Fighters": "Dövüşçüler", "All weapons": "Tüm silahlar", "Random": "Rastgele", "Tap a card for the highlighted player.": "Seçili oyuncu için bir karta dokun.", "What the menu made. Change anything (see the config guide) and start.": "Menünün oluşturduğu maç. İstediğini değiştir ve başlat.", "Fight with this JSON": "Bu JSON ile dövüş", "Fight!": "Dövüş!", "Others join with": "Diğerleri şununla katılır:", "copied": "kopyalandı", "Pick a fight from the list.": "Listeden bir dövüş seç.", "waiting for the other player to pick a fighter ...": "diğer oyuncunun dövüşçü seçmesi bekleniyor ...", "waiting for the host ...": "host bekleniyor ...", "connected - waiting for the host to choose a match ...": "bağlandı - host'un maç seçmesi bekleniyor ...", "connecting to": "bağlanılıyor:", "the network server does not answer": "ağ sunucusu cevap vermiyor", "no host at": "bu adreste host yok:", "(has the host chosen Host yet?)": "(host, Host'a bastı mı?)", "could not open the network server:": "ağ sunucusu açılamadı:", "random": "rastgele"};
 // the page came from another device (server.py --share, or the APK's "Share the game")
 var REMOTE=!window.SF2Native&&!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
 var LANG=(navigator.language||'').toLowerCase().indexOf('tr')==0?'tr':'en';
@@ -1192,12 +1204,14 @@ function config(){                               // the menu's choices as match.
     c.right={human:net&&S.oppHuman};return c}
   c.left=side(0,true);c.right=net?{human:true}:side(1,S.mode!='single');   // network: the other player picks it
   c.location=S.location;D.music[S.location]&&(c.music=D.music[S.location]);c.rounds=+S.rounds;c.round_time=+S.time;
+  S.rules.length&&(c.rules=S.rules.map(ruleXml));
   S.mode=='single'&&S.difficulty&&(c.difficulty=S.difficulty);return c}
 
 function side(i,human){                          // a player card as a match.json side
   var p=S.p[i];if(human&&p.dojo){var en=SLOTS.map(function(t){return(p.ench||{})[t]}).filter(Boolean);   // own fighter, gear from the dojo, any Super,
-    var sk=p.super&&D.abilitySkeleton&&D.abilitySkeleton[p.super]||p.skel;   // a Super with a skeleton of its own wears it; else the one picked
-    return Object.assign({human:true,template:'Default',dojo:true},p.super?{perks:[p.super]}:{},sk?{items:[sk]}:{},en.length?{enchantments:en}:{})}   // an enchantment per slot
+    var sk=p.super&&D.abilitySkeleton&&D.abilitySkeleton[p.super];   // a Super with a skeleton of its own wears it
+    var pk=[p.super,p.extra].filter(Boolean),xs=extraSets(p);
+    return Object.assign({human:true,template:'Default',dojo:true},pk.length?{perks:pk}:{},xs?{perk_sets:xs}:{},sk?{items:[sk]}:{},en.length?{enchantments:en}:{})}   // an enchantment per slot
   var c=CH[p.tpl]||{},s={human:human,template:c.template||p.tpl},L=load(p),items=c.weaponItem?[c.weaponItem]:[];   // a story character: its template, name, picture, weapon
   var sk=p.super&&D.abilitySkeleton&&D.abilitySkeleton[p.super];   // a Super with a skeleton of its own: worn
   c.fname&&(s.name=c.fname,s.avatar=c.avatar);
@@ -1209,6 +1223,26 @@ function side(i,human){                          // a player card as a match.jso
   F.sets&&Object.keys(F.sets).length&&(s.perk_sets=F.sets);   // the traits' values in the form's fight
   F.ench&&F.ench.length&&(s.enchantments=F.ench);   // the form's enchantments (the game's fight gives them)
   !human&&(s.tactic=p.tactic||'Standard');return s}
+function extraSets(p){                          // the extra perk's Set values (the game's own use of it), or null
+  var v=p.extra&&D.extraPerks.fighter[p.extra],o={};return v&&Object.keys(v).length?(o[p.extra]=v,o):null}
+function xmlAttrs(o){var a='';for(var k in o)a+=' '+k+'="'+esc(o[k])+'"';return a}
+function ruleXml(k){                             // a fight rule for both fighters; an area rule brings its area
+  var r=D.extraPerks.rules[k],st=Object.keys(r.sets).length?'<Set'+xmlAttrs(r.sets)+'/>':'';
+  return(r.area?'<RandomArea'+xmlAttrs(r.area)+'/>':'')+['Player','Bot'].map(function(a){
+    return'<Perk Name="'+k+'" ApplyTo="'+a+'">'+st+'</Perk>'}).join('')}
+function perkName(k){return PK(k)[0]}
+function extraSelect(i,p){                       // the own fighter's one extra perk (D.extraPerks.fighter)
+  var F=Object.keys(D.extraPerks.fighter),el=F.filter(function(k){return/^PERK_ELIXIR/.test(k)}),
+    opt=function(k){return'<option value="'+k+'"'+(p.extra==k?' selected':'')+'>'+esc(perkName(k))+'</option>'};
+  return'<div class="row">'+T('Extra perk')+' <select data-extra="'+i+'"><option value="">'+T('none')+'</option><optgroup label="'+
+    T('Fighter perks')+'">'+F.filter(function(k){return el.indexOf(k)<0}).sort(function(a,b){return perkName(a)<perkName(b)?-1:1}).map(opt).join('')+
+    '</optgroup><optgroup label="'+T('Elixirs')+'">'+el.map(opt).join('')+'</optgroup></select></div>'}
+function rulesBox(){                             // fight rules for both fighters (D.extraPerks.rules); one area at a time
+  var R=D.extraPerks.rules;
+  return'<details class="row"'+(S.rules.length?' open':'')+'><summary>'+T('Fight rules')+(S.rules.length?' ('+S.rules.length+')':'')+'</summary>'+
+    Object.keys(R).sort(function(a,b){return perkName(a)<perkName(b)?-1:1}).map(function(k){var d=PK(k)[2];
+    return'<label style="display:inline-block;margin:4px 14px 4px 0"'+(d?' title="'+esc(d)+'"':'')+'><input type="checkbox" data-rule="'+k+'"'+
+      (S.rules.indexOf(k)>=0?' checked':'')+'> '+esc(perkName(k))+(R[k].area?' <span class="muted">('+T('area')+')</span>':'')+'</label>'}).join('')+'</details>'}
 function pickChar(p,name){var c=CH[name]||{};p.tpl=name;p.form=c.form|0;p.super=(form(p).ability)||''}
 function form(p){var c=CH[p.tpl]||{},f=c.forms||[];if(p.form==null||!f[p.form])p.form=c.form|0;return f[p.form]||{load:{}}}   // its chosen form
 function load(p){return form(p).load}
@@ -1344,7 +1378,7 @@ function player(i){
   if(p.dojo)return'<div class="pl act" data-player="'+i+'"><div class="hd">'+avatar(CH.Default)+'<div><div class="muted">'+
     who+'</div><h3>'+T('Own fighter')+'</h3><div class="muted">'+T('gear from the dojo; the match starts from its fight button')+'</div></div></div>'+
     '<div class="row">'+abilitySelect(i,{forms:Object.keys(D.abilities).map(function(k){return{ability:k}})},p)+armorNote(p)+'</div>'+   // any boss ability (perks come from the dojo's perk screen)
-    enchSelect(i,p)+skelSelect(i,p)+describe([p.super].concat(SLOTS.map(function(t){return(p.ench||{})[t]})),skelInfo(p))+dojo+'</div>';
+    extraSelect(i,p)+enchSelect(i,p)+describe([p.super].concat(SLOTS.map(function(t){return(p.ench||{})[t]}),[p.extra]),'',extraSets(p))+dojo+'</div>';
   var L=load(p),tr=form(p).traits||[],en=form(p).ench||[],pk=PK;   // a trait or enchantment: [name, item slot or ""]
   var fx=function(slot){return(slot?en:tr).filter(function(x){return pk(x)[1]==slot}).map(function(x){return esc(pk(x)[0])})};
   var its=SLOTS.map(function(t,k){var n=k?L[t]:c.items&&c.items[k],it=n&&R.start.indexOf(n)<0&&D.items[n],e=fx(t);   // start items: nothing worn
@@ -1370,25 +1404,16 @@ function formSelect(i,c,p){                     // a character as in the game: o
     return'<option value="'+k+'"'+(p.form==k?' selected':'')+'>'+esc(label(x)+what(x))+'</option>'}).join('')+'</select></div>'}
 function describe(list,extra,sets){              // "What they do": the Super and the traits, each game text once;
   var pk=function(x){return PK(x,sets)},seen={},d=[];                         // an enchantment's strength depends on the item slot, so the slot is named
-  list.forEach(function(x){if(!x||!pk(x)[2])return;var k=pk(x)[0]+'\n'+pk(x)[2],sl=pk(x)[1];
+  list.forEach(function(x){if(!x)return;var k=pk(x)[0]+'\n'+pk(x)[2],sl=pk(x)[1];   // no game text: its name alone
     seen[k]?sl&&seen[k].slots.indexOf(sl)<0&&seen[k].slots.push(sl):d.push(seen[k]={x:x,slots:sl?[sl]:[]})});
   return d.length||extra?'<details class="row fx"><summary>'+T('What they do')+'</summary>'+(extra||'')+
     d.map(function(e){var x=e.x;return'<div><b>'+esc(x==list[0]&&D.abilities[x]?'Super - '+cap(abilityName(x)):pk(x)[0]+
-      (e.slots.length?' ('+e.slots.map(T).join(', ')+')':''))+'</b>: '+esc(pk(x)[2])+'</div>'}).join('')+'</details>':''}
-function skelName(k){                           // SkeletonHeavy -> Heavy, BODY_TENTACLE_SKELETON -> Tentacle, Skeleton -> Normal
-  var n=k.replace(/^BODY_/,'').replace(/_?skeleton_?/i,'').replace(/_/g,' ').trim();return T(n?cap(n.toLowerCase()):'Normal')}
-function skelOf(p){return p.super&&D.abilitySkeleton&&D.abilitySkeleton[p.super]||p.skel||'Skeleton'}   // what the own fighter wears
-function skelSelect(i,p){                       // own fighter's skeleton (a Super with its own skeleton wears that one)
-  var S2=D.skeletons||{},own=p.super&&D.abilitySkeleton&&D.abilitySkeleton[p.super];if(Object.keys(S2).length<2)return'';
-  return'<div class="row">'+T('Skeleton')+' <select data-skel="'+i+'"'+(own?' disabled':'')+'>'+Object.keys(S2).map(function(k){
-    return'<option value="'+(k=='Skeleton'?'':k)+'"'+(skelOf(p)==k?' selected':'')+'>'+esc(skelName(k))+'</option>'}).join('')+'</select>'+
-    (own?' <span class="warn">'+T('its Super wears its own')+'</span>':'')+'</div>'}
-function skelInfo(p){var k=skelOf(p),x=(D.skeletons||{})[k];return x?'<div><b>'+T('Skeleton')+' - '+esc(skelName(k))+'</b>: '+esc(LANG=='tr'?x[1]:x[0])+'</div>':''}
+      (e.slots.length?' ('+e.slots.map(T).join(', ')+')':''))+'</b>'+(pk(x)[2]?': '+esc(pk(x)[2]):'')+'</div>'}).join('')+'</details>':''}
 function armorNote(p){                         // the armor a Super needs, if any (D.abilityArmor)
   var a=p.super&&D.abilityArmor&&D.abilityArmor[p.super],it=a&&D.items[a];
   return a?' <span class="warn">'+T('Works only with this armor:')+' '+esc(it?cap(it.display):a)+'</span>':''}
 function PK(x,sets){                            // a perk's [name, item slot, description] in the menu's language where the game has it;
-  var e=D.perks[x]||[x,'',''],t=LANG=='tr'&&D.perksTr&&D.perksTr[x],r=t?[t[0]||e[0],e[1],t[1]||e[2]]:e.slice(0,3),
+  var e=D.perks[x]||[cap(x.replace(/^(BOSS_)?PERK_/,'').replace(/_/g,' ').toLowerCase()),'',''],t=LANG=='tr'&&D.perksTr&&D.perksTr[x],r=t?[t[0]||e[0],e[1],t[1]||e[2]]:e.slice(0,3),
     fl=t&&t[1]?t[2]:e[3];                        // with a fight's own Set values the numbers are filled again
   if(sets&&sets[x]&&fl)r[2]=fillText(fl.t,fl.f,Object.assign({},fl.base,sets[x]));return r}
 var XF=[function(x){return x*100},function(x){return x},function(x){return x/60},function(x){return(Math.pow(2,x/1e4)-1)*100},
@@ -1424,11 +1449,11 @@ function screenFree(){
   var g=S.setup;
   return bar(T(g?'Your fighter':'Free fight'),1)+'<div class="wrap">'+(S.wait?'<div class="row"><b>'+esc(S.wait)+'</b></div>':'')+
     '<div class="two">'+player(0)+player(1)+'</div>'+(g?'<div class="row muted">'+T('The host chose:')+' '+esc(cap(g.location))+', '+g.rounds+
-    ' '+T('rounds')+' &times; '+g.round_time+' s. '+T('You play on the right.')+'</div>':
+    ' '+T('rounds')+' &times; '+g.round_time+' s. '+((g.rules||[]).length?T('Fight rules')+': '+esc((g.rules||[]).map(function(x){return perkName(/Name="([^"]+)"/.exec(x)[1])}).join(', '))+'. ':'')+T('You play on the right.')+'</div>':
     '<div class="row">'+T('Place')+' <select data-k="location">'+D.locations.map(function(l){return'<option value="'+l+'"'+(S.location==l?' selected':'')+'>'+esc(cap(l))+'</option>'}).join('')+'</select>'+
     ' '+T('Rounds')+' <input type="number" min="1" max="9" style="width:60px" data-k="rounds" value="'+S.rounds+'">'+
     ' '+T('Seconds')+' <input type="number" min="10" max="999" style="width:70px" data-k="time" value="'+S.time+'">'+
-    (S.mode=='single'?' '+T('Difficulty')+' '+diffSelect():'')+'</div>')+
+    (S.mode=='single'?' '+T('Difficulty')+' '+diffSelect():'')+'</div>'+rulesBox())+
     '<div class="err">'+esc(err)+'</div>'+
     '<div class="row">'+['boss','underworld','character','fighter'].filter(function(t){return t!='underworld'||D.characters.some(function(c){return c.kind==t})}).map(function(t){return'<button data-tab="'+t+'"'+(S.tab==t?' class="on"':'')+'>'+T({boss:'Bosses',underworld:'Underworld',character:'Characters',fighter:'Fighters'}[t])+'</button>'}).join('')+
     (S.tab=='fighter'?'<select data-k="weapon"><option value="">'+T('All weapons')+'</option>'+weapons.map(function(w){return'<option'+(S.weapon==w?' selected':'')+'>'+w+'</option>'}).join('')+'</select>':'')+
@@ -1479,10 +1504,11 @@ function change(ev){
   if(a.k){S[a.k]=t.type=='checkbox'?t.checked:t.value}
   else if(a.super!=null)S.p[+a.super].super=t.value;
   else if(a.ench){var q=a.ench.split(':'),pp=S.p[+q[0]];pp.ench=pp.ench||{};pp.ench[q[1]]=t.value}
-  else if(a.skel!=null){S.p[+a.skel].skel=t.value}
   else if(a.form!=null){var q=S.p[+a.form],f=(CH[q.tpl].forms||[])[+t.value];q.form=+t.value;q.super=f&&f.ability||''}
   else if(a.tactic)S.p[1].tactic=t.value;
   else if(a.dojo!=null)S.p[+a.dojo].dojo=t.checked;
+  else if(a.extra!=null)S.p[+a.extra].extra=t.value;
+  else if(a.rule){var R=D.extraPerks.rules;S.rules=S.rules.filter(function(k){return k!=a.rule&&!(t.checked&&R[a.rule].area&&R[k].area)});t.checked&&S.rules.push(a.rule)}
   else return;
   if(t.type=='number')return;                    // a number changes nothing else: no redraw (it would take the focus)
   if(t.tagName=='INPUT'&&t.type!='checkbox'&&t.type!='number'){clearTimeout(change.t);change.t=setTimeout(function(){draw();var n=root.querySelector('[data-k="'+a.k+'"]');n&&(n.focus(),n.setSelectionRange(n.value.length,n.value.length))},250)}
@@ -2148,46 +2174,6 @@ MAX_LEVEL = 52         # the player's top level: free fights are fought at it (e
 GENERIC_NAMES = 3      # a FirstName more templates share is a generic fighter ("Ninja"), not a character
 
 
-def skeletons(entries, www):
-    """the skeletons a fighter can wear (list.xml Type and SubType "Skeleton") and how each differs from
-    the plain one (mdl_skeleton), read from its model: heavier joints, a head that counts as body, legs no
-    hit reaches, extra nodes (Director Hoaxen's tentacles). Returns {item: [english, turkish]}"""
-    files = {}
-    for p in glob.glob(os.path.join(www, "res", "models*.dat")):
-        files.update(dict(read_dat(p)[0]))
-
-    def model(name):
-        d = files.get(name)
-        return d and ET.fromstring(d.decode("utf-8", "replace").lstrip("\ufeff"))
-    base = model("mdl_skeleton")
-    sup = {k: p for p, k in ability_skeleton(entries).items()}
-    out = {}
-    for it in ET.fromstring(get_xml(entries, "res/list.xml")).iter("Item"):
-        m = it.get("Type") == "Skeleton" == it.get("SubType") and model(it.get("Model") or "")
-        if m is None or m is False or base is None:
-            continue
-        en, tr = [], []
-        mass = lambda x: sum(float(n.get("Mass") or 0) for n in x.find("Nodes") if n.get("Type") == "Node")
-        bn = {n.tag for n in base.find("Nodes")}
-        r = mass(m) / mass(base)
-        if len(m.find("Nodes")) == len(base.find("Nodes")) and r > 1.05:
-            en.append(f"heavier (x{r:.1f} mass): harder to knock around"); tr.append(f"daha ağır (x{r:.1f} kütle): daha zor savrulur")
-        edges = {e.tag: e for e in (m.find("Edges") if m.find("Edges") is not None else [])}
-        if edges.get("EHead") is not None and edges["EHead"].get("Defense") == "BodyDefense":
-            en.append("no head hits: the head counts as body (body defense)"); tr.append("kafa vuruşu yok: kafa gövde sayılır (gövde savunması)")
-        if edges.get("EThigh_1") is not None and edges["EThigh_1"].get("Collisible") == "0":
-            en.append("no hit reaches the legs"); tr.append("bacaklara vuruş değmez")
-        extra = [n.tag for n in m.find("Nodes") if n.tag not in bn]   # MacroNode: tentacle parts
-        if extra:
-            q = sup.get(it.get("Name"))
-            en.append(f"{len(extra)} extra parts (tentacles)" if any("spike" in x.lower() for x in extra) else f"{len(extra)} extra parts")
-            tr.append(f"{len(extra)} ek parça (dokunaçlar)" if any("spike" in x.lower() for x in extra) else f"{len(extra)} ek parça")
-            q and (en.append(f"the {q[5:].replace('_', ' ').title()} Super needs it"),
-                   tr.append(f"{q[5:].replace('_', ' ').title()} Super'i bunu ister"))
-        out[it.get("Name")] = ["; ".join(en) or "the usual skeleton", "; ".join(tr) or "herkesin iskeleti"]
-    return out
-
-
 def body_bound(entries, www):
     """Super abilities whose animation moves more nodes than the start outfit's models have (skeleton,
     armor, helm; the game reads model node n for animation node n). Android animations store the node
@@ -2371,7 +2357,9 @@ def menu_data(entries, www, out):
                        "opponents": [lang.get(inherited(w.get("Template"), "FirstName") or w.get("FirstName"),
                                               w.get("FirstName") or w.get("Template") or "?")
                                      if w.find("Groups") is None else "?" for w in b["warriors"]]})   # ?: random from groups
-    pnames = {t for c in chars for f in c["forms"] for t in f["traits"]} | set(abil) | set(ench)
+    extra = extra_perks(entries, ench)
+    pnames = {t for c in chars for f in c["forms"] for t in f["traits"]} | set(abil) | set(ench) | \
+        set(extra["fighter"]) | set(extra["rules"])
     return {"characters": chars, "items": item_info, "avatars": avatars, "fights": fights,
             "locations": sorted(music), "music": {k: max(set(v), key=v.count) for k, v in music.items()},
             "tactics": sorted(set(re.findall(r'<Tactic Name="([^"]+)"', get_xml(entries, "res/tactic_settings.xml")))),
@@ -2383,12 +2371,90 @@ def menu_data(entries, www, out):
                 (p, [f["load"]["Armor"] for c in chars for f in c["forms"] if f.get("ability") == p and f["load"].get("Armor")])
                 for p in body_bound(entries, www)) if a},
             "abilitySkeleton": ability_skeleton(entries),   # put on with the Super
-            "skeletons": skeletons(entries, www),   # the own fighter picks one
             "enchantments": {t: sorted(n for n, x in ench.items() if x == t) for t in SLOTS},
+            "extraPerks": extra,                  # the own fighter's extra perk; fight rules (extra_perks)
             "perks": perk_info(entries, lang, pnames),
             # the menu in Turkish: the game's Turkish texts (name, description) where it has them
             "perksTr": {n: [v[0], v[2], v[3]] for n, v in perk_info(entries, tr_lang, pnames, tr=True).items()},
             "superPerksTr": {n: tr_lang.get(n) or lang.get(n, n) for n in super_perks(entries)}}
+
+
+# perks that can do nothing in a match here (checked by hand)
+NOT_FOR_MATCHES = {
+    "PERK_SPHERE_COOLDOWN": "the raid's sphere button, which matches do not have",
+    "PERK_SPHERES_BALANCER": "scales the raid's sphere missiles (all factors 1)",
+    "PERK_FIGHT_WITH_HOAXEN": "a cooldown for Hoaxen's own move (ShopMagicHungerClaws)",
+    "PERK_TITAN_DEATH": "Titan's death animation",
+    "PERK_PREDICTION": "its effects (mgc_effect_prediction_*) are in no version of the game",
+    "PERK_TIME_SURGE": "its effect (mgc_surge_time_effec) is in no version of the game",
+}
+
+
+def extra_perks(entries, ench):
+    """The perks the menu offers besides the dojo's perk tree, Supers, enchantments and set bonuses.
+    "fighter": the own fighter's one extra perk (boss traits, elixirs ...). "rules": fight rules, given to both
+    fighters. A perk is a rule when the game puts it in a fight's <Rules>, or hides its icon (Hidden="1",
+    as rule perks do). Set values and an area rule's RandomArea come from the game's own use of the perk.
+    A fighter perk is one that is neither hidden nor tied to an area. Left out: what other parts of the menu
+    give (and the Default template's own perks), perks other perks build on (Template), abilities (built on
+    PERK_BOSS_ABILITY: they are moves), perks an item gives, developer perks (debug lines), perks that only
+    show an icon, test perks, perks a newer version replaced (_OLD), area perks without an area in the game."""
+    px = ET.fromstring(get_xml(entries, "res/perks.xml").lstrip("﻿"))
+    perks = {p.get("Name"): p for p in px if p.tag == "Perk" and p.get("Name")}
+    base = {p.get("Template") for p in perks.values()}
+    cp, li = get_xml(entries, "res/character_progress.xml"), get_xml(entries, "res/list.xml")
+    default = ET.fromstring(get_xml(entries, "res/stages.xml").lstrip("\ufeff")).find(".//Template[@Name='Default']")
+    given = {p.get("Name") for p in default.iter("Perk")} | set(ability_perks(entries)) | set(super_perks(entries)) | set(ench) | \
+        set(re.findall(r'<Perk Name="([^"]+)"', li)) | set(re.findall(r'\b(PERK_\w+)', cp))
+
+    def chain(n):
+        seen = []
+        while n in perks and n not in seen:
+            seen.append(n)
+            n = perks[n].get("Template")
+        return seen
+
+    def acts(n):
+        return {a.tag for t in perks[n].iter("Actions") for a in t}
+
+    stages = ET.fromstring(get_xml(entries, "res/stages.xml").lstrip("﻿"))
+    in_rules, on_fighters = {}, {}
+    for f in stages.iter("Fight"):
+        rules = f.find("Rules")
+        for parent in ([] if rules is None else [rules] + list(rules.iter())):
+            area = parent.find("RandomArea")
+            for p in parent.findall("Perk"):
+                st = p.find("Set")
+                in_rules.setdefault(p.get("Name"), ({} if st is None else dict(st.attrib),
+                                                    None if area is None else dict(area.attrib)))
+        for w in f.iter("Warrior"):
+            for p in w.iter("Perk"):
+                st = p.find("Set")
+                on_fighters.setdefault(p.get("Name"), {} if st is None else dict(st.attrib))
+    for t in stages.iter("Template"):
+        for p in t.iter("Perk"):
+            st = p.find("Set")
+            on_fighters.setdefault(p.get("Name"), {} if st is None else dict(st.attrib))
+
+    fighter, rules, seen = {}, {}, set()
+    for n, p in perks.items():
+        body = re.sub(r'^<Perk Name="[^"]*"', "", ET.tostring(p, encoding="unicode"))   # a copy under another name
+        if body in seen:
+            continue
+        seen.add(body)
+        if (n in given or n in NOT_FOR_MATCHES or n in base or "PERK_BOSS_ABILITY" in chain(n)[1:] or p.get("ItemSet")
+                or "TEST" in n or n.endswith("_OLD") and n[:-4] in perks
+                or "ShowDebugLine" in acts(n) or not acts(n) - {"ModIcon"}):
+            continue
+        area = re.search(r"<(AreaEnter|AreaExit|InTheArea)\b", ET.tostring(p, encoding="unicode"))
+        hidden = p.get("Hidden") == "1"
+        if n in in_rules or hidden:
+            sets, ra = in_rules.get(n, ({}, None))
+            if not area or ra:
+                rules[n] = {"sets": sets, "area": ra if area else None}
+        if not area and not hidden:
+            fighter[n] = on_fighters.get(n, {})
+    return {"fighter": fighter, "rules": rules}
 
 
 PERCENT_TRANSFORMS = (                   # how a level-up text shows a Set value
