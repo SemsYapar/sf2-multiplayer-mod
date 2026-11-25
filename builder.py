@@ -1160,6 +1160,9 @@ var css=`
 #sf2m .pl.act{border-color:#f3c66b;box-shadow:0 0 0 1px #f3c66b}
 #sf2m .pl .hd{display:flex;gap:10px;align-items:center}
 #sf2m .pl .hd img,#sf2m .pl .hd .ph{width:64px;height:64px;border-radius:50%;object-fit:cover}
+#sf2m .pics{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;max-height:220px;overflow:auto}
+#sf2m .pics img{width:48px;height:48px;border-radius:50%;object-fit:cover;cursor:pointer;border:2px solid transparent}
+#sf2m .pics img.on,#sf2m .pics img:hover{border-color:#e0b050}
 #sf2m .pl h3{margin:0;color:#f3c66b;text-transform:capitalize}
 #sf2m .its{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 #sf2m .it{width:86px;font-size:10px;text-align:center;color:#c9b48d}
@@ -1183,7 +1186,9 @@ var css=`
 @media (max-width:700px){#sf2m .two{grid-template-columns:1fr}#sf2m .big{width:100%}}`;
 function el(h){var d=document.createElement('div');d.innerHTML=h;return d.firstElementChild}
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
-function cap(s){return String(s||'').toLowerCase().replace(/_/g,' ').replace(/(^|[\s(\-])\w/g,function(c){return c.toUpperCase()})}   // capital first letters (not after an apostrophe: Lynx's)
+function cap(s){                                 // capital first letters (not after an apostrophe: Lynx's). A text with
+  s=String(s||'').replace(/_/g,' ');var l=/[ÇĞÖŞÜİçğöşüı]/.test(s)?'tr':'en';   // a Turkish letter is lowered the Turkish way
+  return s.toLocaleLowerCase(l).replace(/(^|[\s(\-])([^\s(\-])/g,function(c){return c.toLocaleUpperCase(l)})}   // (KISA KILIÇ -> Kısa Kılıç); KENJI: Kenji
 var CH={};D.characters.forEach(function(c){CH[c.name]=c});
 function dname(c){return LANG=='tr'&&c.displayTr||c.display}   // a character's name in the menu's language
 function avatar(c,cls){var u=c&&D.avatars[c.avatar];return u?'<img class="'+(cls||'')+'" src="'+u+'" loading="lazy">':'<div class="ph '+(cls||'')+'">'+esc((c&&c.display||'?')[0])+'</div>'}
@@ -1303,8 +1308,10 @@ function ownCard(i,p,who,dojo){                 // the own fighter: name, pictur
   var tree=Object.keys(lv).map(function(k){return esc(perkName(k))+(lv[k]>1?' '+lv[k]:'')});
   return'<div class="pl act" data-player="'+i+'"><div class="hd">'+avatar(av)+'<div><div class="muted">'+who+'</div>'+
     '<input data-ownname="1" maxlength="20" placeholder="'+T('Your name')+'" value="'+esc(o.name||'')+'">'+
-    '<div class="muted">'+T('Picture')+' <select data-ownav="1"><option value="">'+T('the classic shadow')+'</option>'+
-      pics.filter(function(c){return!seen[c.avatar]&&(seen[c.avatar]=1)}).map(function(c){return'<option value="'+esc(c.avatar)+'"'+(o.avatar==c.avatar?' selected':'')+'>'+esc(cap(dname(c)))+'</option>'}).join('')+'</select></div></div></div>'+
+    '</div></div><details class="row"'+(S.picOpen?' open':'')+' data-picbox="1"><summary>'+T('Picture')+'</summary><div class="pics">'+   // the catalog: hover shows it
+      [CH.Default].concat(pics.filter(function(c){return!seen[c.avatar]&&(seen[c.avatar]=1)})).map(function(c){var u=D.avatars[c.avatar];
+        return u?'<img src="'+u+'" loading="lazy" title="'+esc(cap(dname(c)))+'" data-ownpick="'+(c===CH.Default?'':esc(c.avatar))+'"'+((o.avatar||'')==(c===CH.Default?'':c.avatar)?' class="on"':'')+
+          ' onmouseover="var h=this.closest(\'.pl\').querySelector(\'.hd img\');h&&(h.src=this.src)">':''}).join('')+'</div></details>'+
     (o.items?'<div class="its">'+its+'</div>'+(tree.length?'<div class="row fx">'+T('Perk tree')+': '+tree.join(', ')+'</div>':''):'')+
     '<div class="row">'+abilitySelect(i,{forms:Object.keys(D.abilities).map(function(k){return{ability:k}})},p)+armorNote(p)+'</div>'+   // any boss ability
     extraSelect(i,p)+enchSelect(i,p)+describe([p.super].concat(SLOTS.map(function(t){return(p.ench||{})[t]}),[p.extra]),'',extraSets(p))+
@@ -1548,6 +1555,8 @@ function draw(){
   var y=body&&body.scrollTop;root.innerHTML=h+'<div class="by">by Sems</div>';body=root;y&&(root.scrollTop=y)}
 
 function on(ev){
+  var pk=ev.target.closest('[data-ownpick]');if(pk){ownSet('avatar',pk.dataset.ownpick);S.picOpen=false;return draw()}   // own fighter's picture
+  var pb=ev.target.closest('[data-picbox] summary');pb&&(S.picOpen=!S.picOpen);
   if(ev.target.closest('input,select,label,details'))return;   // their change event handles it (a redraw here would lose it)
   var t=ev.target.closest('[data-a],[data-mode],[data-net],[data-type],[data-fight],[data-ch],[data-player],[data-tab],[data-try]');if(!t)return;
   var a=t.dataset;
@@ -1587,7 +1596,6 @@ function change(ev){
   else if(a.dojo!=null)S.p[+a.dojo].dojo=t.checked;
   else if(a.edit!=null)S.p[+a.edit].edit=t.checked;
   else if(a.ownname){ownSet('name',t.value.trim());return}   // typing: kept, no redraw
-  else if(a.ownav!=null)ownSet('avatar',t.value);
   else if(a.extra!=null)S.p[+a.extra].extra=t.value;
   else if(a.rule){var R=D.rules,r=R[a.rule];S.rules=S.rules.filter(function(k){return k!=a.rule&&!(t.checked&&(r.area&&R[k].area||r.win&&R[k].win))});t.checked&&S.rules.push(a.rule)}
   else return;
