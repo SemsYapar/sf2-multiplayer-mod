@@ -1273,8 +1273,12 @@ function config(){                               // the menu's choices as match.
 // game after the dojo: __sf2SaveOwn)
 function ownGet(){try{return JSON.parse(localStorage.getItem('sf2-own')||'{}')||{}}catch(e){return{}}}
 function ownSet(k,v){var o=ownGet();o[k]=v;try{localStorage.setItem('sf2-own',JSON.stringify(o))}catch(e){}}
+// the own fighter's Super, extra perk and enchantments are kept with it too (the card shows and changes them)
+function ownLoad(p){var o=ownGet();p.super=o.super||'';p.extra=o.extra||'';p.ench=Object.assign({},o.ench||{})}
+function ownKeep(p){var o=ownGet();o.super=p.super||'';o.extra=p.extra||'';o.ench=p.ench||{};
+  try{localStorage.setItem('sf2-own',JSON.stringify(o))}catch(e){}}
 function side(i,human){                          // a player card as a match.json side
-  var p=S.p[i];if(human&&p.dojo){var en=SLOTS.map(function(t){return(p.ench||{})[t]}).filter(Boolean);   // own fighter: saved, or gear from the dojo; any Super,
+  var p=S.p[i];human&&p.dojo&&ownLoad(p);if(human&&p.dojo){var en=SLOTS.map(function(t){return(p.ench||{})[t]}).filter(Boolean);   // own fighter: saved, or gear from the dojo; any Super,
     var sk=p.super&&D.abilitySkeleton&&D.abilitySkeleton[p.super];   // a Super with a skeleton of its own wears it
     var pk=[p.super,p.extra].filter(Boolean),xs=extraSets(p),o=ownGet();
     return Object.assign({human:true,template:'Default'},o.name?{name:o.name}:{},o.avatar?{avatar:o.avatar}:{},
@@ -1300,6 +1304,7 @@ function ruleName(k){var r=D.rules[k];return r?LANG=='tr'?r.nameTr:r.name:k}
 function ruleText(k){var r=D.rules[k];return r?LANG=='tr'?r.textTr:r.text:''}
 function perkName(k){return PK(k)[0]}
 function ownCard(i,p,who,dojo){                 // the own fighter: name, picture, saved gear and perks, Super ...
+  ownLoad(p);
   var o=ownGet(),ed=p.edit||!o.items,av=o.avatar?{avatar:o.avatar}:CH.Default;
   var pics=D.characters.filter(function(c){return c.avatar&&D.avatars[c.avatar]}),seen={};
   var its=(o.items||[]).map(function(n,k){var it=n&&D.items[n.split('@')[0]];it=it&&R.start.indexOf(n.split('@')[0])<0?it:null;
@@ -1589,14 +1594,14 @@ function on(ev){
 function change(ev){
   var t=ev.target,a=t.dataset;
   if(a.k){S[a.k]=t.type=='checkbox'?t.checked:t.value}
-  else if(a.super!=null)S.p[+a.super].super=t.value;
-  else if(a.ench){var q=a.ench.split(':'),pp=S.p[+q[0]];pp.ench=pp.ench||{};pp.ench[q[1]]=t.value}
+  else if(a.super!=null){var pp=S.p[+a.super];pp.super=t.value;pp.dojo&&ownKeep(pp)}
+  else if(a.ench){var q=a.ench.split(':'),pp=S.p[+q[0]];pp.ench=pp.ench||{};pp.ench[q[1]]=t.value;pp.dojo&&ownKeep(pp)}
   else if(a.form!=null){var q=S.p[+a.form],f=(CH[q.tpl].forms||[])[+t.value];q.form=+t.value;q.super=f&&f.ability||''}
   else if(a.tactic)S.p[1].tactic=t.value;
   else if(a.dojo!=null)S.p[+a.dojo].dojo=t.checked;
   else if(a.edit!=null)S.p[+a.edit].edit=t.checked;
   else if(a.ownname){ownSet('name',t.value.trim());return}   // typing: kept, no redraw
-  else if(a.extra!=null)S.p[+a.extra].extra=t.value;
+  else if(a.extra!=null){var pp=S.p[+a.extra];pp.extra=t.value;pp.dojo&&ownKeep(pp)}
   else if(a.rule){var R=D.rules,r=R[a.rule];S.rules=S.rules.filter(function(k){return k!=a.rule&&!(t.checked&&(r.area&&R[k].area||r.win&&R[k].win))});t.checked&&S.rules.push(a.rule)}
   else return;
   if(t.type=='number')return;                    // a number changes nothing else: no redraw (it would take the focus)
