@@ -51,6 +51,16 @@ Open http://localhost:8080/ in Chrome or Edge. The menu has:
 - **Two players, network**: each on their own device
 - **Normal game**: the game as it is, with its own save
 
+In a free fight you pick the fighters, the place, the rounds and the game's own fight rules (darkness,
+earthquakes, ring-out ...). Every perk, enchantment and rule has a description with its numbers.
+
+### Your own fighter
+
+Tick **My own fighter** on your card, type a name and pick a picture. The first time you choose your
+gear and perk tree in the dojo; its fight button starts the match and saves them. From then on the
+fighter is ready without the dojo; tick **Change gear and perk tree in the dojo first** to change it.
+Your name and picture show on the VS screen.
+
 ### Sharing the game with other devices
 
 A PC or an Android phone with the app can share the game. Other devices on the same network (phones,
@@ -67,6 +77,11 @@ is needed: a phone's hotspot is enough.
 One player chooses **Two players, network > Create match**. The other enters the host's address
 and joins. The host can be a PC, the Android app, or a device that opened a shared game (its match
 then runs through the sharing device). Only the inputs travel; both devices run the same simulation.
+
+Each key press is used a few frames after it is pressed (the input delay, shown at the bottom of the
+screen), so it reaches the other device in time. The delay is set from the ping when the match starts
+and grows by a frame if the other device keeps waiting. A fixed value can be set with
+`lan_input_delay` in the match JSON.
 
 ## Android app (optional)
 

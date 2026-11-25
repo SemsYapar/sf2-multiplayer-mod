@@ -59,14 +59,6 @@ try:
 except ImportError:
     sys.exit("pip install zstandard")
 
-# The dojo's perk tree for every fighter of a custom match: one perk of each pair (character_progress.xml
-# PerkTree, levels 3 ... 45), each at a level (0 = not taken). At level 52 a player has 9 perks and 36
-# upgrades: these picks spend them as the game offers them (each upgrade to the lower of the two offered).
-TREE = {"PERK_COBRA": 0, "PERK_DESPERATE": 5, "PERK_AVENGER": 0, "PERK_ROCK": 3, "PERK_HELM_BREAKER": 0,
-        "PERK_FURIOUS": 4, "PERK_PAIN_RAGE": 5, "PERK_CONCUSSION": 0, "PERK_FULL_POWER": 5, "PERK_EAGLE_EYE": 0,
-        "PERK_STEEL_FOOT": 0, "PERK_BLOCK_BREAKER": 5, "PERK_MARTIAL_SPIRIT": 5, "PERK_OVERCHARGE": 0,
-        "PERK_ENLIGHTENMENT": 0, "PERK_MIRROR": 6, "PERK_DISORIENTATION": 0, "PERK_RICOCHET": 7}
-
 DEFAULTS = {
     # a fight of the game ("ZONE/BATTLE/FIGHT", see --list battles) with its own opponents, rules and place;
     # you are the player. Only the settings marked "game fight" below apply to it
@@ -89,7 +81,7 @@ DEFAULTS = {
     "left": {                          # game fight: the player (only "human", "tactic", "items" apply)
         "human": True,                 # False = AI with "tactic"
         "template": "Default",         # --list templates; null = no template
-        "name": None,                  # FirstName: a text key from res/lang (e.g. "NAME_KENJI"); null = template's
+        "name": None,                  # FirstName: a game text key (NAME_..., character...) or any name as it is; null = template's
         "avatar": None,
         "items": [],                   # --list items; added over the template's items (same slot = replaced)
         "perks": [],                   # --list perks
@@ -103,12 +95,13 @@ DEFAULTS = {
         "power": None,                 # WarriorPower
         "attrs": {},                   # any Warrior attribute, e.g. {"WeaponDamage": 20}
         "align": [[0, 0]],             # AttributesAlign [[factor, shift], ...]; [[0,0]] = raw stats; null = template's
-        "tree": TREE,                  # custom match: the dojo perk tree, perk -> level (0 = not taken; one of each pair)
+        "own": None,                   # the own fighter as saved after the dojo: {"items": [5 x "NAME@upgrade"],
+                                       # "perks": ["PERK@level", ...] (the perk screen's)}; no dojo then
         "extra_xml": "",               # raw XML appended inside <Warrior>
     },
     "right": {                         # game fight: the game's opponents (only "human" applies; default false)
         "human": True, "template": "Man_Kungfu", "name": None, "avatar": None, "items": [], "perks": [], "perk_sets": {}, "enchantments": [],
-        "tactic": "Standard", "dojo": False, "power": None, "attrs": {}, "align": [[0, 0]], "tree": TREE, "extra_xml": "",
+        "tactic": "Standard", "dojo": False, "power": None, "attrs": {}, "align": [[0, 0]], "own": None, "extra_xml": "",
     },
 }
 
@@ -199,18 +192,15 @@ function __sf2Resolve(user){
 function __sf2Esc(v){return String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function __sf2WarriorXml(s){                    // a side of a custom match as a <Warrior>
   var a=[],av=s.avatar||(__SF2DATA.avatarFix||{})[s.template];   // a template without its picture: the classic shadow
-  s.template&&a.push(['Template',s.template]);s.name&&a.push(['FirstName',s.name]);av&&a.push(['Avatar',av]);
+  s.template&&a.push(['Template',s.template]);s.name&&a.push(['FirstName',/^(NAME_|character)\w*$/.test(s.name)?s.name:'SF2TEXT_'+s.name.replace(/[{}%]/g,'')]);av&&a.push(['Avatar',av]);   // name: a game text key (a character's) or itself
   s.human?a.push(['Controlled','1'],['NotAI','1']):a.push(['Tactic',s.tactic]);
   s.power!=null&&a.push(['WarriorPower',s.power]);for(var k in s.attrs)a.push([k,s.attrs[k]]);
   var inner='';
   s.items.length&&(inner+='<Items>'+s.items.map(function(i){return'<Item Name="'+__sf2Esc(i)+'"/>'}).join('')+'</Items>');
   var en=s.enchantments||[],asp=__SF2DATA.enchAspect;   // enchantments: as the game gives them, perks with their strength
   var ps=s.perk_sets||{},set=function(i){var v=ps[i],a='';for(var k in v)a+=' '+k+'="'+__sf2Esc(v[k])+'"';return a?'<Set'+a+'/>':''};   // a fight's own values
-  var T=__SF2DATA.tree,tr=Object.keys(s.tree||{}).filter(function(k){return s.tree[k]>0&&s.perks.indexOf(k)<0});   // the dojo tree:
-  var tset=function(k){var v=T.sets[k][Math.min(s.tree[k],T.sets[k].length)-1],a='';for(var x in v)a+=' '+x+'="'+__sf2Esc(v[x])+'"';return'<Set'+a+'/>'};   // its level's values
-  (s.perks.length||en.length||tr.length)&&(inner+='<Perks>'+s.perks.map(function(i){var t=set(i);return'<Perk Name="'+__sf2Esc(i)+'"'+(t?'>'+t+'</Perk>':'/>')}).join('')+
-    en.map(function(i){return'<Perk Name="'+__sf2Esc(i)+'"><Set Aspect="'+asp+'"/></Perk>'}).join('')+
-    tr.map(function(k){return'<Perk Name="'+k+'">'+tset(k)+'</Perk>'}).join('')+'</Perks>');
+  (s.perks.length||en.length)&&(inner+='<Perks>'+s.perks.map(function(i){var t=set(i);return'<Perk Name="'+__sf2Esc(i)+'"'+(t?'>'+t+'</Perk>':'/>')}).join('')+
+    en.map(function(i){return'<Perk Name="'+__sf2Esc(i)+'"><Set Aspect="'+asp+'"/></Perk>'}).join('')+'</Perks>');
   s.align!=null&&(inner+='<AttributesAlign>'+s.align.map(function(d){return'<Delta Factor="'+d[0]+'" Shift="'+d[1]+'" Priority="1"/>'}).join('')+'</AttributesAlign>');
   return'<Warrior '+a.map(function(x){return x[0]+'="'+__sf2Esc(x[1])+'"'}).join(' ')+'>'+inner+s.extra_xml+'</Warrior>'}
 function __sf2BattleXml(c){                     // the custom match's <Battle> in zone ZONE_T
@@ -289,8 +279,8 @@ function __sf2FighterBindings(Oc,yy,F){        // input device -> fighter (0 lef
 
 // the light under the left fighter: hidden while that fighter is invisible (e.g. Lynx's cloak), unless
 // this screen belongs to that fighter's player alone; otherwise the other player would see where it is
-function __sf2Light(L){var F=window.__sf2API&&__sf2API.fight,m=F&&F.zb,
-  hide=!!(m&&m.go&&m.go.node.ln==1&&__sf2IsMatch(F)&&!(__sf2Lan?__sf2Lan.side==0:__SF2.humans.length==1&&__SF2.humans[0]==0));
+function __sf2Light(L){var F=window.__sf2API&&__sf2API.fight,m=F&&(__sf2Lan&&__sf2Lan.side==1?F.pb:F.zb),   // under this device's fighter
+  hide=!!(m&&m.go&&m.go.node.ln==1&&__sf2IsMatch(F)&&!(__sf2Lan||__SF2.humans.length==1&&__SF2.humans[0]==0));
   if(hide){L.R(!1);L.__sf2Hid=1}else if(L.__sf2Hid){L.R(!0);L.__sf2Hid=0}
   return!hide}
 
@@ -527,10 +517,16 @@ function __sf2LookFrame(){var A=window.__sf2API,z=A&&A.za&&A.za.instance,f=A&&A.
     m.Ja.tu<m.Ja.JU&&(m.Ja.tu=Math.min(m.Ja.JU,m.Ja.tu+m.Ja.JU/45))}   // Super: the game's own charge, which in a fight fills
                                                   // during a round ($Ja drops control 14 below it) - the dojo has no round
   __sf2LookOn=!!__sf2Look;__sf2LookOn&&requestAnimationFrame(__sf2LookFrame)}
+// a round's end type for two players (patch "two-player round result"): a time-out without a judging rule
+// (3) or a double knockout (0) -> 6, the PvP judgement by health
+function __sf2Judge(F){var t=F.ty;return __SF2.humans&&__SF2.humans.length==2&&F.Zu==null&&
+  (t==3||t==0&&F.kc.jd<=0&&F.Zb.jd<=0)?6:t}
 // the game behind the menu (over the dojo, after a Try): stopped - no frames, no sound
 function __sf2Pause(on){var I=window.__sf2API&&__sf2API.J&&__sf2API.J.I;if(!I||!I.Nc)return;
-  // the game's own pause for a hidden tab (Kp: loop stopped, sound muted; Np: both back), and no input
-  if(on){I.gga().KF(!1);I.Kp()}else if(!I.Nc.active){I.gga().KF(!0);I.ed().reset();I.Np()}
+  // what the game's pause for a hidden tab does (pause: loop stopped, lS: sound off; resume, M6: both back),
+  // called directly: the platform's Kp / Np do nothing where the portal lacks "visibilitychange" (the network
+  // and the app), which kept the dojo running behind the menu. And no input
+  if(on){I.gga().KF(!1);I.pause();I.lS()}else if(!I.Nc.active){I.gga().KF(!0);I.ed().reset();I.resume();I.M6()}
   on||setTimeout(function(){var A=window.__sf2API;   // a Try that ended: the dojo with the player's gear (none if a new Try began)
     if(__sf2LookReload&&!__sf2Look){__sf2LookReload=false;A.ya.F().Ud.ag==3&&A.ya.F().xp(3)}},0)}
 function __sf2TryUndo(){var A=window.__sf2API,b=sessionStorage.getItem('sf2-try');if(!b||!A||!A.p)return;
@@ -539,18 +535,30 @@ function __sf2Prepare(sc,p){                     // scene state 1; false = wait
   if(!__sf2Ours(sc.Da)||sc.__sf2Done)return true;
   var sides=[sc.OA.G,sc.yf.G[0]];
   if(!__SF2.custom){                             // game fight: the player is the player, opponents are the game's
-    if(__sf2Lan){var n=__sf2Lan.items();if(!n)return false;__sf2PutOn(sides[0],n[0],p,true)}
+    if(__sf2Lan){var n=__sf2Lan.items();if(!n)return false;__sf2PutOn(sides[0],n[0],p,true);   // the player's gear
+      var pk=__sf2Lan.perks[0];pk&&(sides[0].cF.length=0,pk.forEach(function(x){var k=__sf2PerkOf(x);k&&sides[0].cF.push(k)}))}   // and perk-screen perks: the left player's, on both
     else if(!__sf2Hub.on&&__SF2.leftItems.length)__sf2PutOn(sides[0],__SF2.leftItems,p,true)}   // no dojo: left.items
   else if(!__sf2Hub.on);
   else if(__sf2Lan){var n=__sf2Lan.items();if(!n)return false;     // null: a champion, as the XML has it
     n[0]&&__sf2PutOn(sides[0],n[0],p);n[1]&&__sf2PutOn(sides[1],n[1],p)}
   else{var me=sides[__SF2.humans[0]];__sf2PutOn(me,__sf2Equip(p.o.Ca),p);   // the dojo's gear, and the perks chosen on its
-    var T=__SF2DATA.tree,on=function(n){return me.cF.some(function(x){return x&&(x.name==n||T.pairs[x.name]==n)})};   // perk screen (cF: the tree's;
-    p.o.Ca.cF.forEach(function(k){me.cF.indexOf(k)<0&&!on(k.name)&&me.cF.push(k)})}   // the match's tree wins; network: not yet, both sides alike)
+    p.o.Ca.cF.forEach(function(k){me.cF.indexOf(k)<0&&me.cF.push(k)});__sf2SaveOwn(p.o.Ca)}   // perk screen; kept as the own fighter
+  __SF2.custom&&[__SF2.cfg.left,__SF2.cfg.right].forEach(function(s,i){var o=s.own;if(!o||s.dojo)return;   // a saved own fighter: no dojo,
+    __sf2PutOn(sides[i],o.items||[],p,true);(o.perks||[]).forEach(function(x){var k=__sf2PerkOf(x);k&&sides[i].cF.push(k)})});   // the same on both devices
   sides.forEach(__sf2Sets);
   __sf2BotStrength(sc,sides);
   sc.__sf2Done=true;return true}
 
+// A perk chosen on the dojo's perk screen as text, "NAME@level": each upgrade level is a perk of its own
+// (v.Vg.pT, matched on name and Uc as the perk screen does), so a name alone would lose the upgrades
+function __sf2PerkKey(k){return k.name+(k.Uc!=null?'@'+k.Uc:'')}
+function __sf2PerkOf(s){var a=String(s).split('@'),V=__sf2API.v.Vg;
+  if(a.length>1)for(var i=0,P=V.pT;i<P.length;i++)if(P[i].name==a[0]&&String(P[i].Uc)==a[1])return P[i];
+  return V.tn(a[0])}
+// the own fighter after the dojo (gear, perk-screen perks), for the menu: localStorage sf2-own (it adds
+// the name and picture)
+function __sf2SaveOwn(zc){try{var o=JSON.parse(localStorage.getItem('sf2-own')||'{}');
+  o.items=__sf2Equip(zc);o.perks=zc.cF.map(__sf2PerkKey);localStorage.setItem('sf2-own',JSON.stringify(o))}catch(e){}}
 // an item set's bonus (Karcer: Predator's Fury) for a fighter wearing all of its items. Android gives it;
 // the web engine reads item sets but never gives the bonus (list.xml ItemSet DefaultComboPerk; __SF2.itemSets)
 function __sf2Sets(zc){var S=__SF2.itemSets||{},w=__sf2Slots.map(function(t){var it=zc&&zc.Gd(t);return it&&it.name});
@@ -624,7 +632,7 @@ var __sf2Lan=null;
   var L=__sf2Lan={side:-1,seed:0,peer:false,peerHidden:false,active:false,ended:false,fight:null,
     tick:0,sent:-1,D:3,rttMe:-1,rttThem:-1,inp:[{},{}],prev:[0,0],held:{},tc:{},tap:0,
     readyMe:false,readyThem:false,readySent:false,my:{},theirs:{},parts:{},ok:0,desyncAt:-1,
-    lastStep:0,ping:-1,rs:1,ws:null,msg:'',
+    lastStep:0,ping:-1,rs:1,ws:null,msg:'',maxThem:-1,lateAt:0,stalls:[],blocked:false,
     g:0,myGo:null,goThem:{},prepared:false};    // g = match number; every in-match message carries it
 
   function send(o){if(L.ws&&L.ws.readyState===1)L.ws.send(JSON.stringify(o))}
@@ -644,7 +652,8 @@ var __sf2Lan=null;
     ws.onmessage=function(e){var m=JSON.parse(e.data);
       switch(m.t){
         case 'go':L.goThem[m.g]=m;break;
-        case 'i':m.g===L.g&&(L.inp[1-L.side][m.f]=m.m);break;
+        case 'i':m.g===L.g&&(L.inp[1-L.side][m.f]=m.m,L.maxThem=Math.max(L.maxThem,m.f));break;
+        case 'late':m.g===L.g&&L.active&&!(__SF2.delay>0)&&performance.now()-L.lateAt>3000&&L.D<Math.min(10,L.D0+3)&&(L.D++,L.lateAt=performance.now());break;   // at most 3 frames more
         case 'h':if(m.g===L.g){L.theirs[m.f]=m.h;cmp(m.f)}break;
         case 'dbg':if(m.g===L.g)__sf2Report('desync','frame '+m.f+' differs (mine / the other side\'s): '+detail(m.f,m.p)+
           ' - the other side runs '+m.ua);break;
@@ -731,15 +740,18 @@ var __sf2Lan=null;
     for(var i=0;i<V[s].length;i++)if(d>>i&1)(m>>i&1)?__sf2Kb.state.wl(V[s][i]):__sf2Kb.state.release(V[s][i]);
     L.prev[s]=m}
 
-  // a new match: my equipment + a random number go to the other PC
+  // a new match: my equipment, the perks chosen on my dojo's perk screen (my save's, which the other device
+  // does not have: a story fight's player is built from the save) + a random number go to the other PC
   L.go=function(zc){
-    L.g++;L.myGo={t:'go',g:L.g,items:zc?__sf2Equip(zc):null,nonce:(Math.random()*4294967296)>>>0};send(L.myGo)};
+    L.g++;zc&&__SF2.custom&&__sf2SaveOwn(zc);
+    L.myGo={t:'go',g:L.g,items:zc?__sf2Equip(zc):null,perks:zc?zc.cF.filter(Boolean).map(__sf2PerkKey):null,
+      nonce:(Math.random()*4294967296)>>>0};send(L.myGo)};
   // both lists are here -> [left items, right items]; the seed comes from both random numbers
   L.items=function(){
     var them=L.goThem[L.g];if(!L.myGo||!them)return null;
     var a=L.side?them:L.myGo,b=L.side?L.myGo:them;
     if(__sf2Hub.on)L.seed=(Math.imul(a.nonce,2654435761)^b.nonce)>>>0;
-    L.prepared=true;return[a.items,b.items]};
+    L.prepared=true;L.perks=[a.perks,b.perks];return[a.items,b.items]};
   // back in the dojo: forget the match
   L.reset=function(){
     L.active=L.ended=L.prepared=L.readyMe=L.readyThem=L.readySent=false;L.myGo=null;delete L.goThem[L.g];
@@ -756,12 +768,13 @@ var __sf2Lan=null;
     // input delay: both sides know both round trips, so both pick the same value. A key press must reach
     // the other device (half a round trip plus a few ms) before the frame that uses it is simulated
     var r=Math.max(L.rttMe,L.rttThem);
-    L.D=__SF2.delay>0?__SF2.delay:L.rttMe<0||L.rttThem<0?3:Math.min(8,Math.max(1,Math.ceil((r/2+4)/16.67)));
+    L.D=L.D0=__SF2.delay>0?__SF2.delay:L.rttMe<0||L.rttThem<0?3:Math.min(8,Math.max(1,Math.ceil((r/2+4)/16.67)));
     return true};
   L.start=function(F,J,Da){                     // first fight update (scene state 5)
     if(L.active||L.ended||!__sf2Hub.inMatch||!__sf2IsMatch(F))return;   // not while leaving the match
     L.fight=F;L.tick=0;L.prev=[0,0];L.held={};L.tc={};L.tap=0;L.lastStep=performance.now();
     for(var t=0;t<L.D;t++){L.inp[0][t]=0;L.inp[1][t]=0}
+    L.maxThem=L.D-1;L.stalls=[];L.blocked=false;
     L.sent=L.D-1;var s=L.reseed(J,Da,2);
     L.J=J;L.Da=Da;L.sim={vg:new Da.vg.constructor(s),seed:s};L.sw=false;
     __sf2Kb&&__sf2Kb.state.reset();
@@ -774,7 +787,15 @@ var __sf2Lan=null;
   L.canStep=function(){                         // may the engine run its next fixed step?
     if(!L.active)return true;
     while(L.sent<L.tick+L.D){L.sent++;var m=sample();L.inp[L.side][L.sent]=m;sendG({t:'i',f:L.sent,m:m})}
-    return L.inp[1-L.side][L.tick]!==undefined};
+    var ok=L.inp[1-L.side][L.tick]!==undefined,now=performance.now();
+    if(!ok&&!L.blocked){                         // the other's input is late: 3 times in 5 s -> it should send
+      L.stalls=L.stalls.filter(function(x){return now-x<5000});L.stalls.push(now);   // earlier (a frame more of delay)
+      L.stalls.length>=3&&(L.stalls=[],sendG({t:'late'}))}
+    L.blocked=!ok;return ok};
+  // Smooth pace: the clock runs a little slower while the other's inputs only just arrive (this device is
+  // ahead), a little faster when they are far ahead (behind), so the two meet without a stop. A stop does not
+  // pile up time either: no burst of steps after it (patch "LAN pacing")
+  L.pace=function(){if(!L.active)return 1;var s=L.maxThem-L.tick;return s<1?.92:s>L.D+3?1.08:1};
   L.pre=function(){                             // right before step L.tick
     if(!L.active)return;var t=L.tick;
     if(t%10===0){var h=hash();L.my[t]=h;L.parts[t]=parts();delete L.parts[t-600];sendG({t:'h',f:t,h:h});cmp(t)}
@@ -884,6 +905,23 @@ JS_PATCHES = [
     # when the enemy holds the giant sword) was checked against the fighter's own items: Titan got the
     # victim's move and his victims did not, so his throw grabbed nothing. Player="Enemy" now checks the
     # enemy's items (jb; none yet: locked)
+    # Two players: the game gives a round to the opponent (the right side) on a time-out (no rule judging)
+    # and on a knockout where both are down (health equal). Two players are judged like the game's own PvP
+    # fights (ty 6): more health wins, equal = nobody gets the round
+    ("two-player round result",
+     r'this\.v4a\(this\.Qfa\(!0\),this\.Qfa\(!1\),this\.ty\)\)\}',
+     'this.v4a(this.Qfa(!0),this.Qfa(!1),this.ty=__sf2Judge(this)))}'),
+    # The camera keeps the player (the left fighter) in view when the two are far apart, and the pulsing light
+    # is under it. On the second network device the player is the right fighter: the two are swapped there
+    # (the camera only places the picture; the simulation does not read it)
+    ("camera and light follow this device's fighter",
+     r'U3a\(\)\{let a=\s?this\.Nu\.ma,b=new H\(this\.D\$\.ma\.x,this\.D\$\.ma\.y,0,1\),c=new H\(this\.E\$\.ma\.x,this\.E\$\.ma\.y,0,1\);',
+     'U3a(){let a=this.Nu.ma,s=__sf2Lan&&__sf2Lan.side==1,b=s?this.E$:this.D$,c=s?this.D$:this.E$;b=new H(b.ma.x,b.ma.y,0,1);c=new H(c.ma.x,c.ma.y,0,1);'),
+    # A text key "SF2TEXT_..." is its own text: the own fighter's name (FirstName is a text key; a name
+    # that is no key shows %%ERROR%% on the VS screen)
+    ("literal texts",
+     r'if\(!X\.Xa\(this\.iV,b\)\)return rc\.L7;',
+     'if(!X.Xa(this.iV,b))return b.indexOf("SF2TEXT_")==0?b.slice(8):rc.L7;'),
     ("item lock on the enemy",
      r'class ym extends Ha\{constructor\(a\)\{super\(13\);',
      'class ym extends Ha{constructor(a){super(13);this.__sf2Enemy=a.attributes.get("Player")=="Enemy";'),
@@ -1033,6 +1071,9 @@ JS_PATCHES = [
     ("LAN touch release",
      r'H3\(a\)\{if\(this\.dFa\(a\.control\)\)',
      'H3(a){if(__sf2Lan&&__sf2Lan.touch(a,!1))return;if(this.dFa(a.control))'),
+    ("LAN pacing",
+     r'b\.Uy\+=a\*b\.XL;b\.Uy>\.25&&\(b\.Uy=\.25\);',
+     'b.Uy+=a*b.XL*(__sf2Lan?__sf2Lan.pace():1);b.Uy>.25&&(b.Uy=.25);__sf2Lan&&__sf2Lan.blocked&&b.Uy>b.Jm&&(b.Uy=b.Jm);'),
     # fixed-step loop: a step runs only when both players' inputs for it are known
     ("LAN step gate",
      r'for\(a=!1;b\.Uy>=b\.Jm;\)b\.lyb\+\+,c\(b\.Jm\)',
@@ -1148,7 +1189,7 @@ function dname(c){return LANG=='tr'&&c.displayTr||c.display}   // a character's 
 function avatar(c,cls){var u=c&&D.avatars[c.avatar];return u?'<img class="'+(cls||'')+'" src="'+u+'" loading="lazy">':'<div class="ph '+(cls||'')+'">'+esc((c&&c.display||'?')[0])+'</div>'}
 var root,body,err='';
 // Turkish on a Turkish device, English elsewhere (the game follows the device language too)
-var TR={"Extra perk": "Ekstra perk", "Fighter perks": "Dövüşçü perkleri", "Elixirs": "İksirler", "Fight rules": "Dövüş kuralları", "area": "alan", "win": "kazanma", "Dojo tree": "Dojo ağacı", "Try": "Dene", "Try it in the dojo": "Dojoda dene", "What they do": "Ne işe yarıyorlar", "no ranged": "fırlatma yok", "no magic": "büyü yok", "no helm": "kask yok", "no armor": "zırh yok", "no weapon": "silah yok", "Normal game": "Normal oyun", "The game as it is, with its own save on this device (export / import it with the \u2630 button). Unlimited energy.": "Oyunun kendisi, bu cihazda kendi kaydıyla (\u2630 butonuyla dışa / içe aktarılır). Enerji sınırsız.", "Play": "Oyna", "With cheats: money and gems": "Hileli: para ve elmas", "Back": "Geri", "Traits": "Özellikler", "Enchantments": "Tılsımlar", "Works only with this armor:": "Sadece bu zırhla çalışır:", "Weapon": "Silah", "Close": "Kapat","Form": "Form", "template": "şablon", "Bosses": "Bosslar", "Underworld": "Yeraltı", "Android extra": "Android ekleri", "phase": "aşama", "Zone": "Bölge","own": "kendi", "others": "diğerleri", "Ability": "Yetenek", "Up when charged": "dolunca Yukarı", "Ability key": "Yetenek tuşu", "Ranged": "Fırlatma", "Magic": "Büyü", "Helm": "Kask", "Armor": "Zırh", "none": "yok","Create match": "Maç kur", "You choose the match and play on the left. Opens this device to the other player.": "Maçı sen seçer, solda oynarsın. Bu cihazı diğer oyuncuya açar.", "You choose the match and play on the left, on the server this page came from:": "Maçı sen seçer, solda oynarsın; bu sayfanın geldiği sunucuda:", "Share the game": "Oyunu paylaş", "Other devices (iPhones too) open the game from this one in their browser, then play through it. This device does not have to play.": "Diğer cihazlar (iPhone da) oyunu bu cihazdan tarayıcılarında açar ve bunun üzerinden oynar. Bu cihazın oynaması gerekmez.", "Game port": "Oyun portu", "Network port": "Ağ portu", "Share": "Paylaş", "Other devices open": "Diğer cihazlar şunu açsın:", "Keep this app open while others play.": "Diğerleri oynarken bu uygulamayı açık tut.","Shadow Fight 2": "Shadow Fight 2", "Single player": "Tek oyuncu", "You against the AI.": "Sen, yapay zekâya karşı.", "Two players, this PC": "İki oyuncu, bu PC", "Both on one keyboard. Not on phones.": "İkiniz bir klavyede. Telefonda yok.", "Two players, network": "İki oyuncu, ağ", "Each on their own device, through a relay server.": "Herkes kendi cihazında, ağ sunucusu üzerinden.", "Host": "Host", "Opens this device to the other player. You choose the match and play on the left.": "Bu cihazı diğer oyuncuya açar. Maçı sen seçersin, solda oynarsın.", "Port": "Port", "Join": "Katıl", "The host chooses the match; you pick your fighter and play on the right.": "Maçı host seçer; sen dövüşçünü seçip sağda oynarsın.", "host address, e.g. 192.168.1.20:8081": "host adresi, ör. 192.168.1.20:8081", "Choose the match": "Maçı seç", "Story fight": "Hikâye dövüşü", "A fight of the game as it is: its opponents, rules and place.": "Oyundaki bir dövüş olduğu gibi: rakipleri, kuralları, mekânı.", "Free fight": "Serbest dövüş", "Pick the fighters, the place and the rules.": "Dövüşçüleri, mekânı ve kuralları seç.", "No balancing (level 52, every item)": "Dengeleme yok (seviye 52, her eşya)", "No balancing (AI as its template)": "Dengeleme yok (yapay zekâ şablonu gibi)", "Very Easy": "Çok kolay", "Easy": "Kolay", "Middle": "Orta", "Hard": "Zor", "Very Hard": "Çok zor", "All zones": "Tüm bölgeler", "All types": "Tüm türler", "search": "ara", "Difficulty": "Zorluk", "The other player plays the opponents": "Rakipleri diğer oyuncu oynar", "You fight as yourself: pick your gear in the dojo, then its fight button starts the fight. Difficulty sets your level so that the game rates the fight that way.": "Kendin olarak dövüşürsün: eşyalarını dojoda seç, dojonun dövüş butonu dövüşü başlatır. Zorluk, oyunun dövüşü öyle değerlendireceği seviyeye seni ayarlar.", "Player 1": "Oyuncu 1", "Player 2": "Oyuncu 2", "Opponent (AI)": "Rakip (yapay zekâ)", "picks on their own device": "kendi cihazında seçiyor", "My own fighter: I pick the gear in the dojo": "Kendi dövüşçüm: eşyaları dojoda seçerim", "Own fighter": "Kendi dövüşçün", "gear from the dojo; the match starts from its fight button": "eşyalar dojodan; maç dojonun dövüş butonuyla başlar", "none": "yok", "Tactic": "Taktik", "Your fighter": "Dövüşçün", "The host chose:": "Host seçti:", "rounds": "raund", "You play on the right.": "Sen sağda oynarsın.", "Place": "Mekân", "Rounds": "Raund", "Seconds": "Saniye", "Bosses": "Bosslar", "Characters": "Karakterler", "Fighters": "Dövüşçüler", "All weapons": "Tüm silahlar", "Random": "Rastgele", "Tap a card for the highlighted player.": "Seçili oyuncu için bir karta dokun.", "What the menu made. Change anything (see the config guide) and start.": "Menünün oluşturduğu maç. İstediğini değiştir ve başlat.", "Fight with this JSON": "Bu JSON ile dövüş", "Fight!": "Dövüş!", "Others join with": "Diğerleri şununla katılır:", "copied": "kopyalandı", "Pick a fight from the list.": "Listeden bir dövüş seç.", "waiting for the other player to pick a fighter ...": "diğer oyuncunun dövüşçü seçmesi bekleniyor ...", "waiting for the host ...": "host bekleniyor ...", "connected - waiting for the host to choose a match ...": "bağlandı - host'un maç seçmesi bekleniyor ...", "connecting to": "bağlanılıyor:", "the network server does not answer": "ağ sunucusu cevap vermiyor", "no host at": "bu adreste host yok:", "(has the host chosen Host yet?)": "(host, Host'a bastı mı?)", "could not open the network server:": "ağ sunucusu açılamadı:", "random": "rastgele"};
+var TR={"Extra perk": "Ekstra perk", "Fighter perks": "Dövüşçü perkleri", "Elixirs": "İksirler", "Fight rules": "Dövüş kuralları", "area": "alan", "win": "kazanma", "Your name": "Adın", "Picture": "Resim", "the classic shadow": "klasik gölge", "Perk tree": "Yetenek ağacı", "Change gear and perk tree in the dojo first": "Önce dojoda eşyaları ve yetenek ağacını değiştir", "First fight: pick your gear and perk tree in the dojo, its fight button starts the fight. They are kept for the next fights.": "İlk dövüş: eşyalarını ve yetenek ağacını dojoda seç, dojonun dövüş butonu dövüşü başlatır. Sonraki dövüşler için saklanır.", "My own fighter": "Kendi dövüşçüm", "Try": "Dene", "Try it in the dojo": "Dojoda dene", "What they do": "Ne işe yarıyorlar", "no ranged": "fırlatma yok", "no magic": "büyü yok", "no helm": "kask yok", "no armor": "zırh yok", "no weapon": "silah yok", "Normal game": "Normal oyun", "The game as it is, with its own save on this device (export / import it with the \u2630 button). Unlimited energy.": "Oyunun kendisi, bu cihazda kendi kaydıyla (\u2630 butonuyla dışa / içe aktarılır). Enerji sınırsız.", "Play": "Oyna", "With cheats: money and gems": "Hileli: para ve elmas", "Back": "Geri", "Traits": "Özellikler", "Enchantments": "Tılsımlar", "Works only with this armor:": "Sadece bu zırhla çalışır:", "Weapon": "Silah", "Close": "Kapat","Form": "Form", "template": "şablon", "Bosses": "Bosslar", "Underworld": "Yeraltı", "Android extra": "Android ekleri", "phase": "aşama", "Zone": "Bölge","own": "kendi", "others": "diğerleri", "Ability": "Yetenek", "Up when charged": "dolunca Yukarı", "Ability key": "Yetenek tuşu", "Ranged": "Fırlatma", "Magic": "Büyü", "Helm": "Kask", "Armor": "Zırh", "none": "yok","Create match": "Maç kur", "You choose the match and play on the left. Opens this device to the other player.": "Maçı sen seçer, solda oynarsın. Bu cihazı diğer oyuncuya açar.", "You choose the match and play on the left, on the server this page came from:": "Maçı sen seçer, solda oynarsın; bu sayfanın geldiği sunucuda:", "Share the game": "Oyunu paylaş", "Other devices (iPhones too) open the game from this one in their browser, then play through it. This device does not have to play.": "Diğer cihazlar (iPhone da) oyunu bu cihazdan tarayıcılarında açar ve bunun üzerinden oynar. Bu cihazın oynaması gerekmez.", "Game port": "Oyun portu", "Network port": "Ağ portu", "Share": "Paylaş", "Other devices open": "Diğer cihazlar şunu açsın:", "Keep this app open while others play.": "Diğerleri oynarken bu uygulamayı açık tut.","Shadow Fight 2": "Shadow Fight 2", "Single player": "Tek oyuncu", "You against the AI.": "Sen, yapay zekâya karşı.", "Two players, this PC": "İki oyuncu, bu PC", "Both on one keyboard. Not on phones.": "İkiniz bir klavyede. Telefonda yok.", "Two players, network": "İki oyuncu, ağ", "Each on their own device, through a relay server.": "Herkes kendi cihazında, ağ sunucusu üzerinden.", "Host": "Host", "Opens this device to the other player. You choose the match and play on the left.": "Bu cihazı diğer oyuncuya açar. Maçı sen seçersin, solda oynarsın.", "Port": "Port", "Join": "Katıl", "The host chooses the match; you pick your fighter and play on the right.": "Maçı host seçer; sen dövüşçünü seçip sağda oynarsın.", "host address, e.g. 192.168.1.20:8081": "host adresi, ör. 192.168.1.20:8081", "Choose the match": "Maçı seç", "Story fight": "Hikâye dövüşü", "A fight of the game as it is: its opponents, rules and place.": "Oyundaki bir dövüş olduğu gibi: rakipleri, kuralları, mekânı.", "Free fight": "Serbest dövüş", "Pick the fighters, the place and the rules.": "Dövüşçüleri, mekânı ve kuralları seç.", "No balancing (level 52, every item)": "Dengeleme yok (seviye 52, her eşya)", "No balancing (AI as its template)": "Dengeleme yok (yapay zekâ şablonu gibi)", "Very Easy": "Çok kolay", "Easy": "Kolay", "Middle": "Orta", "Hard": "Zor", "Very Hard": "Çok zor", "All zones": "Tüm bölgeler", "All types": "Tüm türler", "search": "ara", "Difficulty": "Zorluk", "The other player plays the opponents": "Rakipleri diğer oyuncu oynar", "You fight as yourself: pick your gear in the dojo, then its fight button starts the fight. Difficulty sets your level so that the game rates the fight that way.": "Kendin olarak dövüşürsün: eşyalarını dojoda seç, dojonun dövüş butonu dövüşü başlatır. Zorluk, oyunun dövüşü öyle değerlendireceği seviyeye seni ayarlar.", "Player 1": "Oyuncu 1", "Player 2": "Oyuncu 2", "Opponent (AI)": "Rakip (yapay zekâ)", "picks on their own device": "kendi cihazında seçiyor", "My own fighter: I pick the gear in the dojo": "Kendi dövüşçüm: eşyaları dojoda seçerim", "Own fighter": "Kendi dövüşçün", "gear from the dojo; the match starts from its fight button": "eşyalar dojodan; maç dojonun dövüş butonuyla başlar", "none": "yok", "Tactic": "Taktik", "Your fighter": "Dövüşçün", "The host chose:": "Host seçti:", "rounds": "raund", "You play on the right.": "Sen sağda oynarsın.", "Place": "Mekân", "Rounds": "Raund", "Seconds": "Saniye", "Bosses": "Bosslar", "Characters": "Karakterler", "Fighters": "Dövüşçüler", "All weapons": "Tüm silahlar", "Random": "Rastgele", "Tap a card for the highlighted player.": "Seçili oyuncu için bir karta dokun.", "What the menu made. Change anything (see the config guide) and start.": "Menünün oluşturduğu maç. İstediğini değiştir ve başlat.", "Fight with this JSON": "Bu JSON ile dövüş", "Fight!": "Dövüş!", "Others join with": "Diğerleri şununla katılır:", "copied": "kopyalandı", "Pick a fight from the list.": "Listeden bir dövüş seç.", "waiting for the other player to pick a fighter ...": "diğer oyuncunun dövüşçü seçmesi bekleniyor ...", "waiting for the host ...": "host bekleniyor ...", "connected - waiting for the host to choose a match ...": "bağlandı - host'un maç seçmesi bekleniyor ...", "connecting to": "bağlanılıyor:", "the network server does not answer": "ağ sunucusu cevap vermiyor", "no host at": "bu adreste host yok:", "(has the host chosen Host yet?)": "(host, Host'a bastı mı?)", "could not open the network server:": "ağ sunucusu açılamadı:", "random": "rastgele"};
 // the page came from another device (server.py --share, or the APK's "Share the game")
 var REMOTE=!window.SF2Native&&!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
 var LANG=(navigator.language||'').toLowerCase().indexOf('tr')==0?'tr':'en';
@@ -1195,9 +1236,8 @@ window.__sf2Check=function(user,net){             // the errors in a match.json 
     s.align!=null&&!(Array.isArray(s.align)&&s.align.length&&s.align.every(function(d){return Array.isArray(d)&&d.length==2}))&&
       errs.push(sn+'.align: a list of [factor, shift] pairs, e.g. [[0, 0]]');
     s.items.forEach(function(v){K.why[v]&&errs.push(sn+'.items: "'+v+'" '+K.why[v])});
-    var T=R.tree;for(var k in s.tree){var n=s.tree[k],m=T.sets[k].length;
-      (n!==(n|0)||n<0||n>m)&&errs.push(sn+'.tree.'+k+': a level 0 ... '+m);
-      n>0&&s.tree[T.pairs[k]]>0&&k<T.pairs[k]&&errs.push(sn+'.tree: '+k+' and '+T.pairs[k]+' are a pair, one of them only (set the other to 0)')}});
+    var o=s.own;o&&((o.items||[]).forEach(function(v){v&&!K.items[String(v).split('@')[0]]&&errs.push(sn+'.own.items: no item "'+v+'"')}),
+      (o.perks||[]).forEach(function(v){K.perks.indexOf(String(v).split('@')[0])<0&&errs.push(sn+'.own.perks: no perk "'+v+'"')}))});
   sides.forEach(function(sn){c[sn].template&&has(K.broken,c[sn].template)&&
     errs.push(sn+'.template: "'+c[sn].template+'" is left out: an item\'s 3D model is missing in this game version, or it is only a renamed copy of another template')});
   sides.forEach(function(sn){var s=c[sn];if(!s.dojo)return;
@@ -1224,11 +1264,17 @@ function config(){                               // the menu's choices as match.
   S.rules=S.rules.filter(function(k){return D.rules[k]});S.rules.length&&(c.rules=S.rules.map(ruleXml));
   S.mode=='single'&&S.difficulty&&(c.difficulty=S.difficulty);return c}
 
+// the own fighter, kept on this device: name and picture (menu), gear and perk-screen perks (saved by the
+// game after the dojo: __sf2SaveOwn)
+function ownGet(){try{return JSON.parse(localStorage.getItem('sf2-own')||'{}')||{}}catch(e){return{}}}
+function ownSet(k,v){var o=ownGet();o[k]=v;try{localStorage.setItem('sf2-own',JSON.stringify(o))}catch(e){}}
 function side(i,human){                          // a player card as a match.json side
-  var p=S.p[i];if(human&&p.dojo){var en=SLOTS.map(function(t){return(p.ench||{})[t]}).filter(Boolean);   // own fighter, gear from the dojo, any Super,
+  var p=S.p[i];if(human&&p.dojo){var en=SLOTS.map(function(t){return(p.ench||{})[t]}).filter(Boolean);   // own fighter: saved, or gear from the dojo; any Super,
     var sk=p.super&&D.abilitySkeleton&&D.abilitySkeleton[p.super];   // a Super with a skeleton of its own wears it
-    var pk=[p.super,p.extra].filter(Boolean),xs=extraSets(p);
-    return Object.assign({human:true,template:'Default',dojo:true},pk.length?{perks:pk}:{},xs?{perk_sets:xs}:{},sk?{items:[sk]}:{},en.length?{enchantments:en}:{})}   // an enchantment per slot
+    var pk=[p.super,p.extra].filter(Boolean),xs=extraSets(p),o=ownGet();
+    return Object.assign({human:true,template:'Default'},o.name?{name:o.name}:{},o.avatar?{avatar:o.avatar}:{},
+      p.edit||!o.items?{dojo:true}:{own:{items:o.items,perks:o.perks||[]}},   // the first time and "edit": the dojo
+      pk.length?{perks:pk}:{},xs?{perk_sets:xs}:{},sk?{items:[sk]}:{},en.length?{enchantments:en}:{})}   // an enchantment per slot
   var c=CH[p.tpl]||{},s={human:human,template:c.template||p.tpl},L=load(p),items=c.weaponItem?[c.weaponItem]:[];   // a story character: its template, name, picture, weapon
   var sk=p.super&&D.abilitySkeleton&&D.abilitySkeleton[p.super];   // a Super with a skeleton of its own: worn
   c.fname&&(s.name=c.fname,s.avatar=c.avatar);
@@ -1248,9 +1294,23 @@ function ruleXml(k){                             // a fight rule (D.rules: the g
 function ruleName(k){var r=D.rules[k];return r?LANG=='tr'?r.nameTr:r.name:k}
 function ruleText(k){var r=D.rules[k];return r?LANG=='tr'?r.textTr:r.text:''}
 function perkName(k){return PK(k)[0]}
-function treeLine(){                             // the dojo perk tree every fighter gets (match.json "tree")
-  var t=R.defaults.left.tree,k=Object.keys(t).filter(function(x){return t[x]>0});
-  return'<div class="row muted">'+T('Dojo tree')+': '+k.map(function(x){return esc(perkName(x))+' '+t[x]}).join(', ')+'</div>'}
+function ownCard(i,p,who,dojo){                 // the own fighter: name, picture, saved gear and perks, Super ...
+  var o=ownGet(),ed=p.edit||!o.items,av=o.avatar?{avatar:o.avatar}:CH.Default;
+  var pics=D.characters.filter(function(c){return c.avatar&&D.avatars[c.avatar]}),seen={};
+  var its=(o.items||[]).map(function(n,k){var it=n&&D.items[n.split('@')[0]];it=it&&R.start.indexOf(n.split('@')[0])<0?it:null;
+    return'<div class="it"><div>'+(it&&it.img?'<img src="'+it.img+'">':'&ndash;')+'</div>'+esc(it?cap(it.display):T('no '+SLOTS[k].toLowerCase()))+'</div>'}).join('');
+  var lv={};(o.perks||[]).forEach(function(x){var a=x.split('@');lv[a[0]]=Math.max(lv[a[0]]||0,+a[1]||1)});   // Uc: the level, from 1
+  var tree=Object.keys(lv).map(function(k){return esc(perkName(k))+(lv[k]>1?' '+lv[k]:'')});
+  return'<div class="pl act" data-player="'+i+'"><div class="hd">'+avatar(av)+'<div><div class="muted">'+who+'</div>'+
+    '<input data-ownname="1" maxlength="20" placeholder="'+T('Your name')+'" value="'+esc(o.name||'')+'">'+
+    '<div class="muted">'+T('Picture')+' <select data-ownav="1"><option value="">'+T('the classic shadow')+'</option>'+
+      pics.filter(function(c){return!seen[c.avatar]&&(seen[c.avatar]=1)}).map(function(c){return'<option value="'+esc(c.avatar)+'"'+(o.avatar==c.avatar?' selected':'')+'>'+esc(cap(dname(c)))+'</option>'}).join('')+'</select></div></div></div>'+
+    (o.items?'<div class="its">'+its+'</div>'+(tree.length?'<div class="row fx">'+T('Perk tree')+': '+tree.join(', ')+'</div>':''):'')+
+    '<div class="row">'+abilitySelect(i,{forms:Object.keys(D.abilities).map(function(k){return{ability:k}})},p)+armorNote(p)+'</div>'+   // any boss ability
+    extraSelect(i,p)+enchSelect(i,p)+describe([p.super].concat(SLOTS.map(function(t){return(p.ench||{})[t]}),[p.extra]),'',extraSets(p))+
+    (o.items?'<label class="row"><input type="checkbox" data-edit="'+i+'"'+(p.edit?' checked':'')+'> '+T('Change gear and perk tree in the dojo first')+'</label>':
+      '<div class="row muted">'+T('First fight: pick your gear and perk tree in the dojo, its fight button starts the fight. They are kept for the next fights.')+'</div>')+
+    (ed&&o.items?'<div class="row muted">'+T('gear from the dojo; the match starts from its fight button')+'</div>':'')+dojo+'</div>'}
 function extraSelect(i,p){                       // the own fighter's one extra perk (D.extraPerks.fighter)
   var F=Object.keys(D.extraPerks.fighter),el=F.filter(function(k){return/^PERK_ELIXIR/.test(k)}),
     opt=function(k){return'<option value="'+k+'"'+(p.extra==k?' selected':'')+'>'+esc(perkName(k))+'</option>'};
@@ -1392,14 +1452,11 @@ function canDojo(i){return S.setup?i==1:S.mode=='lan'||S.mode=='single'?i==0:fal
 function player(i){
   var p=S.p[i],c=CH[p.tpl]||{},ai=i==1&&S.mode=='single';
   var dojo=canDojo(i)?'<label class="row"><input type="checkbox" data-dojo="'+i+'"'+(p.dojo?' checked':'')+
-    '> '+T('My own fighter: I pick the gear in the dojo')+'</label>':'';
+    '> '+T('My own fighter')+'</label>':'';
   var who=T(i?'Player 2':'Player 1');
   if(!mine(i))return'<div class="pl"><div class="hd"><div class="ph">?</div><div><div class="muted">'+who+
     '</div><h3>'+T('picks on their own device')+'</h3></div></div></div>';
-  if(p.dojo)return'<div class="pl act" data-player="'+i+'"><div class="hd">'+avatar(CH.Default)+'<div><div class="muted">'+
-    who+'</div><h3>'+T('Own fighter')+'</h3><div class="muted">'+T('gear from the dojo; the match starts from its fight button')+'</div></div></div>'+
-    '<div class="row">'+abilitySelect(i,{forms:Object.keys(D.abilities).map(function(k){return{ability:k}})},p)+armorNote(p)+'</div>'+   // any boss ability (perks come from the dojo's perk screen)
-    extraSelect(i,p)+enchSelect(i,p)+describe([p.super].concat(SLOTS.map(function(t){return(p.ench||{})[t]}),[p.extra]),'',extraSets(p))+treeLine()+dojo+'</div>';
+  if(p.dojo)return ownCard(i,p,who,dojo);
   var L=load(p),tr=form(p).traits||[],en=form(p).ench||[],pk=PK;   // a trait or enchantment: [name, item slot or ""]
   var fx=function(slot){return(slot?en:tr).filter(function(x){return pk(x)[1]==slot}).map(function(x){return esc(pk(x)[0])})};
   var its=SLOTS.map(function(t,k){var n=k?L[t]:c.items&&c.items[k],it=n&&R.start.indexOf(n)<0&&D.items[n],e=fx(t);   // start items: nothing worn
@@ -1408,7 +1465,7 @@ function player(i){
   var own=fx('');
   return'<div class="pl'+(S.active==i?' act':'')+'" data-player="'+i+'"><div class="hd">'+avatar(c)+'<div><div class="muted">'+
     (ai?T('Opponent (AI)'):who)+'</div><h3>'+esc(cap(dname(c)))+'</h3><div class="muted">'+esc(c.weapon)+'</div></div></div>'+
-    '<div class="its">'+its+'</div>'+(own.length?'<div class="row fx">'+T('Traits')+': '+own.join(', ')+'</div>':'')+treeLine()+
+    '<div class="its">'+its+'</div>'+(own.length?'<div class="row fx">'+T('Traits')+': '+own.join(', ')+'</div>':'')+
     describe([p.super].concat(tr,en),'',form(p).sets)+
     formSelect(i,c,p)+'<div class="row">'+abilitySelect(i,c,p)+
     (!ai&&mine(i)?' <button data-try="'+i+'">'+T('Try it in the dojo')+'</button>':'')+
@@ -1528,6 +1585,9 @@ function change(ev){
   else if(a.form!=null){var q=S.p[+a.form],f=(CH[q.tpl].forms||[])[+t.value];q.form=+t.value;q.super=f&&f.ability||''}
   else if(a.tactic)S.p[1].tactic=t.value;
   else if(a.dojo!=null)S.p[+a.dojo].dojo=t.checked;
+  else if(a.edit!=null)S.p[+a.edit].edit=t.checked;
+  else if(a.ownname){ownSet('name',t.value.trim());return}   // typing: kept, no redraw
+  else if(a.ownav!=null)ownSet('avatar',t.value);
   else if(a.extra!=null)S.p[+a.extra].extra=t.value;
   else if(a.rule){var R=D.rules,r=R[a.rule];S.rules=S.rules.filter(function(k){return k!=a.rule&&!(t.checked&&(r.area&&R[k].area||r.win&&R[k].win))});t.checked&&S.rules.push(a.rule)}
   else return;
@@ -1675,6 +1735,12 @@ def parse_items(entries):
     return out
 
 
+# typos in the game's texts (the menu shows them)
+LANG_FIXES = {"tr": [("Dare aldıktan", "Darbe aldıktan"), ("bloğunu baypass etme", "bloğunu aşma"),
+                     ("sihir doldumanı", "sihir dolumunu")]}
+ID_FIXES = [("TELEPORTAION", "TELEPORTATION"), ("FREEZ_", "FREEZE_")]   # typos in perk names shown as names
+
+
 def load_lang(www, code="en"):
     for f in glob.glob(os.path.join(www, "res", "lang", code + ".*.xml")):
         raw = open(f, "rb").read()
@@ -1683,7 +1749,10 @@ def load_lang(www, code="en"):
         lang = dict(re.findall(r'<Word Title="([^"]+)">([^<]*)</Word>', raw.decode("utf-8", "replace")))
         # a text can name another one: "%Tournament_TITLE" (the game resolves it when it shows it: Q_a)
         ref = lambda m: lang.get(m.group(1), m.group(0))
-        return {k: re.sub(r'%(\w+)', ref, v) for k, v in lang.items()}
+        lang = {k: re.sub(r'%(\w+)', ref, v) for k, v in lang.items()}
+        for a, z in LANG_FIXES.get(code, []):
+            lang = {k: v.replace(a, z) for k, v in lang.items()}
+        return lang
     return {}
 
 
@@ -1882,20 +1951,6 @@ def aspect(entries, x):
     a = ET.fromstring(get_xml(entries, "res/internal_settings.xml").lstrip("\ufeff")).find(".//Aspect")
     lim, anti, dr = float(a.get("Limit")), float(a.get("Antilimit")), float(a.get("DoublingRange"))
     return lim - (lim - 1) * 2 ** (-x / dr) if x >= 0 else anti + 2 ** (x / dr)
-
-
-def tree_info(entries):
-    """the dojo perk tree: {"sets": perk -> [Set values of upgrade level 1, 2 ...], "pairs": perk -> the other
-    perk offered with it} (character_progress.xml PerkTree, UpgradeLevel)"""
-    r = ET.fromstring(get_xml(entries, "res/character_progress.xml").lstrip("\ufeff"))
-    pairs = {}
-    for lv in r.find("PerkTree"):
-        ps = [p.get("Name") for p in lv.findall("Perk")]
-        if len(ps) == 2:
-            pairs[ps[0]], pairs[ps[1]] = ps[1], ps[0]
-    sets = {p.get("Name"): [dict(u.find("Set").attrib) for u in p.findall("UpgradeLevel")]
-            for p in r.iter("Perk") if p.get("Name") in pairs and p.find("UpgradeLevel") is not None}
-    return {"sets": sets, "pairs": pairs}
 
 
 def enchant_aspect(entries, level):
@@ -2206,7 +2261,6 @@ def runtime_data(entries, www, profile):
         templates=templates, superPerks=super_perks(entries), superMods=super_mods(entries),
         probeGear=probe_gear(entries, www), maxLevel=MAX_LEVEL, check=check_data(entries, www),
         enchAspect=enchant_aspect(entries, MAX_LEVEL),
-        tree=tree_info(entries),
         itemSets=item_sets(entries),
         avatarFix=template_screen(entries, www)[1],
         profile=hashlib.sha1(profile).hexdigest()[:12])
@@ -2953,7 +3007,7 @@ def perk_info(entries, lang, names, tr=False):
             alias, t = perks[t].get("Alias"), perks[t].get("Template")
         slot = n.rsplit("_", 1)[-1]
         slot = slot.capitalize() if alias and slot in ("WEAPON", "RANGED", "MAGIC", "HELM", "ARMOR") else ""
-        name = lang.get(alias or n) or n.removeprefix("PERK_").replace("_", " ").title()
+        name = lang.get(alias or n) or functools.reduce(lambda x, f: x.replace(*f), ID_FIXES, n).removeprefix("PERK_").replace("_", " ").title()
         r = describe(n)                              # a Super's own text: no numbers to redo
         text, fill = r if isinstance(r, tuple) else (r, None)
         out[n] = [name, slot, text, fill]
