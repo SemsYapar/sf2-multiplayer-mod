@@ -22,6 +22,7 @@ match.json and the controls: see builder.py.
 import argparse
 import base64
 import functools
+import glob
 import hashlib
 import http.server
 import json
@@ -144,11 +145,32 @@ for ext, mt in {".dds": "application/octet-stream", ".dat": "application/octet-s
     mimetypes.add_type(mt, ext)
 
 
+# names browsers ask for without reading the page (Safari: home screen, share sheet) -> the build's file
+DEFAULT_ICONS = {"/apple-touch-icon.png": "apple-touch-icon.*.png",
+                 "/apple-touch-icon-precomposed.png": "apple-touch-icon.*.png", "/favicon.ico": "favicon.*.ico"}
+
+
+class Server(http.server.ThreadingHTTPServer):
+    """A device that leaves (a page closed, a phone locked, a download cancelled) drops its connection:
+    normal, not an error to print"""
+    daemon_threads = True
+
+    def handle_error(self, request, client_address):
+        if isinstance(sys.exc_info()[1], ConnectionError):
+            return
+        super().handle_error(request, client_address)
+
+
 class Handler(http.server.SimpleHTTPRequestHandler):
     match = {"config": None}       # match.json given on the command line (None: the menu first)
 
     def end_headers(self):
-        self.send_header("Cache-Control", "no-store")
+        # the game's files: kept by the browser and asked again each time ("no-cache"): unchanged ones come back
+        # as 304 (by date, If-Modified-Since), so a page load no longer downloads everything again (one
+        # texture file is 40 MB). What is made per request (the match, the port, POST answers): never kept
+        path = self.path.split("?", 1)[0]
+        dynamic = self.command != "GET" or path in ("/match.js", "/sf2-netport")
+        self.send_header("Cache-Control", "no-store" if dynamic else "no-cache")
         super().end_headers()
 
     def do_GET(self):
@@ -158,6 +180,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self.reply(f"window.__SF2_CONFIG={json.dumps(m['config'])};\n".encode(), "text/javascript")
         if path == "/sf2-netport":               # the port the menu's Host suggests (--net-port)
             return self.reply(json.dumps({"port": NETWORK["port"]}).encode(), "application/json")
+        if path in DEFAULT_ICONS:                # asked by iPhones/browsers by these names, whatever the page says
+            found = sorted(glob.glob(os.path.join(self.directory, DEFAULT_ICONS[path])))
+            if found:
+                self.path = "/" + os.path.basename(found[0])
         super().do_GET()
 
     def reply(self, data, mime):
@@ -315,8 +341,7 @@ def start_network_server(port=None):
         NETWORK["server"].server_close()
         NETWORK["server"] = None
     if NETWORK["server"] is None:
-        http.server.ThreadingHTTPServer.daemon_threads = True
-        srv = http.server.ThreadingHTTPServer(("0.0.0.0", port), NetworkHandler)
+        srv = Server(("0.0.0.0", port), NetworkHandler)
         NETWORK["server"], NETWORK["port"] = srv, port
         threading.Thread(target=srv.serve_forever, daemon=True).start()
         print(f"[net]   network server open: others join with {lan_ip()}:{NETWORK['port']} "
@@ -370,9 +395,8 @@ def main(argv=None):
     else:
         print("[match] none given: the menu comes first")
     Handler.match = {"config": user}
-    http.server.ThreadingHTTPServer.daemon_threads = True
     try:
-        srv = http.server.ThreadingHTTPServer(("0.0.0.0" if a.share else "127.0.0.1", a.port),
+        srv = Server(("0.0.0.0" if a.share else "127.0.0.1", a.port),
                                               functools.partial(Handler, directory=out))
     except OSError as e:
         sys.exit(f"port {a.port}: {e.strerror} - choose another with --port")

@@ -73,6 +73,9 @@ A PC or an Android phone with the app can share the game. Other devices on the s
 tablets, iPhones, other PCs) then open it in their browser; they need nothing installed. No internet
 is needed: a phone's hotspot is enough.
 
+On an iPhone, Share > Add to Home Screen opens the game full screen (Safari has no full screen for
+pages). After an update of the mod, remove that icon and add it again: iOS reads the app's settings only then.
+
 - **From a PC:** `python server.py C:\sf2\out --share`, then the others open
   `http://<this PC's IP>:8080/`. Windows may ask to let Python through the firewall.
 - **From the Android app:** **Two players, network > Share the game**. The app shows the address the

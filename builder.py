@@ -613,6 +613,16 @@ function __sf2Sets(zc){var S=__SF2.itemSets||{},w=__sf2Slots.map(function(t){var
 function __sf2SuperModel(F){
   var side=!__sf2IsMatch(F)?0:__sf2Lan?__sf2Lan.side:__SF2.humans.length?__SF2.humans[0]:-1;
   return side==0?F.zb:side==1?F.pb:null}
+// the touch buttons (ranged, magic: shown or not, how full) belong to this device's fighter; the game
+// always shows the left one's, so a phone playing the right side saw the other player's magic button
+function __sf2HudSide(F){return __sf2SuperModel(F)==F.pb&&F.pb?1:0}
+function __sf2HudKit(F){return __sf2HudSide(F)?F.pb.parameters:F.kc}
+// a ranged/magic press counts when the fight's rules allow it and the PRESSING fighter has the item.
+// The game asked the touch buttons (one fighter's kit) for every input device, so in a match of two
+// players the right one's magic was dropped when the left one had none, and in a network match two
+// devices showing different buttons dropped different inputs (an out-of-sync fight)
+function __sf2Allow(h,e,m){var c=e.control,P=m&&m.parameters;
+  return!(h.__sf2Off&&h.__sf2Off[c])&&!!P&&(c==12?P.W$a():P.Y$a())}
 function __sf2HasSuper(m){
   var k=m&&m.parameters&&m.parameters.IK||[];
   for(var i=0;i<k.length;i++)if(k[i]&&__SF2.superPerks.indexOf(k[i].name)>=0)return true;return false}
@@ -1178,12 +1188,24 @@ JS_PATCHES = [
     ("LAN keyup",
      r'this\.state\.release\(b\);this\.event=a;this\.dIa',
      'if(__sf2Lan&&__sf2Lan.key(b,!1,a))return;this.state.release(b);this.event=a;this.dIa'),
+    ("touch buttons follow this device's fighter (kit)",
+     r'qDa\(\)\{return this\.kc\.W\$a\(\)\}tDa\(\)\{return this\.kc\.Y\$a\(\)\}',
+     'qDa(){return __sf2HudKit(this).W$a()}tDa(){return __sf2HudKit(this).Y$a()}'),
+    ("touch buttons follow this device's fighter (charge)",
+     r'a\.Qt!=0&&this\.Da\.type!="FightPVP"',
+     'a.Qt!=__sf2HudSide(this)&&this.Da.type!="FightPVP"'),
     ("LAN touch press",
      r'xS\(a\)\{if\(a\.control!=0&&this\.dFa\(a\.control\)\)',
-     'xS(a){if(__sf2Lan&&__sf2Lan.touch(a,!0))return;if(a.control!=0&&this.dFa(a.control))'),
+     'xS(a){if(__sf2Lan&&__sf2Lan.touch(a,!0))return;if(a.control!=0&&(a.control==11||a.control==12?__sf2Allow(this,a,Oc.Ph(a)):this.dFa(a.control)))'),
     ("LAN touch release",
      r'H3\(a\)\{if\(this\.dFa\(a\.control\)\)',
-     'H3(a){if(__sf2Lan&&__sf2Lan.touch(a,!1))return;if(this.dFa(a.control))'),
+     'H3(a){if(__sf2Lan&&__sf2Lan.touch(a,!1))return;if(a.control==11||a.control==12?__sf2Allow(this,a,Oc.Ph(a)):this.dFa(a.control))'),
+    ("ranged/magic turned off by the fight's rules (remembered apart from the buttons)",
+     r'refresh\(a,b\)\{this\.hNa\(!0\);',
+     'refresh(a,b){this.__sf2Off={};this.hNa(!0);'),
+    ("ranged/magic turned off by the fight's rules (set)",
+     r'case 2:\$a\.F\(\)\.iNa\(!1\);break;case 3:\$a\.F\(\)\.gNa\(!1\)\}',
+     'case 2:$a.F().iNa(!1);($a.F().__sf2Off=$a.F().__sf2Off||{})[11]=1;break;case 3:$a.F().gNa(!1);($a.F().__sf2Off=$a.F().__sf2Off||{})[12]=1}'),
     ("LAN pacing",
      r'b\.Uy\+=a\*b\.XL;b\.Uy>\.25&&\(b\.Uy=\.25\);',
      'b.Uy+=a*b.XL*(__sf2Lan?__sf2Lan.pace():1);b.Uy>.25&&(b.Uy=.25);__sf2Lan&&__sf2Lan.blocked&&b.Uy>b.Jm&&(b.Uy=b.Jm);'),
@@ -3385,8 +3407,11 @@ def build_game(www, out, entries, xml2_path):
         "match.js": b"window.__SF2_CONFIG=null;\n",   # no match: the menu (server.py serves its own match.js)
         os.path.join("sf2menu", "menu.js"): MENU_JS.encode("utf-8"),
         "index.html": home_screen_app(www),
-        "sf2.webmanifest": json.dumps({"name": "Shadow Fight 2", "short_name": "SF2", "start_url": ".",
-                                       "display": "fullscreen", "orientation": "landscape",
+        # scope: every page of the game is the app's; without it Safari sets no scope, and the home-screen
+        # app showed the address bar after its first page change (the menu -> the fight). iOS shows
+        # "fullscreen" as standalone; Android's Chrome uses it
+        "sf2.webmanifest": json.dumps({"name": "Shadow Fight 2", "short_name": "SF2", "id": "./", "start_url": ".",
+                                       "scope": "./", "display": "fullscreen", "orientation": "landscape",
                                        "background_color": "#000000", "icons": [
                                            {"src": os.path.basename(f), "sizes": "180x180", "type": "image/png"}
                                            for f in glob.glob(os.path.join(www, "apple-touch-icon.*.png"))]}).encode(),
