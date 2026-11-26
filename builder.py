@@ -2365,15 +2365,19 @@ def start_equipment(entries):
     return [re.search(r'\b' + t + r'="([^"]*)"', w).group(1) for t in SLOTS]
 
 
-def home_screen_app(www):
-    """iPhone Safari has no fullscreen for pages; the address bar goes away only when the page is added
-    to the home screen. These tags and sf2.webmanifest make it open as a full-screen app."""
-    html = open(os.path.join(www, "index.html"), encoding="utf-8").read()
-    tags = ('<meta name="apple-mobile-web-app-capable" content="yes">'
+# iPhone Safari has no fullscreen for pages; the address bar goes away only when the page is added to the
+# home screen. These tags and sf2.webmanifest make it open as a full-screen app that starts at the menu
+# (start_url). Every page has them: a page without a manifest becomes its own home-screen app, which
+# starts at that page (normal.html: the normal game) and shows the address bar on the next page
+APP_TAGS = ('<meta name="apple-mobile-web-app-capable" content="yes">'
             '<meta name="mobile-web-app-capable" content="yes">'
-            '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">')
-    tags += '<link rel="manifest" href="sf2.webmanifest">'
-    html = html.replace('<meta charset="utf-8">', '<meta charset="utf-8">' + tags, 1)
+            '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">'
+            '<link rel="manifest" href="sf2.webmanifest">')
+
+
+def home_screen_app(www):
+    html = open(os.path.join(www, "index.html"), encoding="utf-8").read()
+    html = html.replace('<meta charset="utf-8">', '<meta charset="utf-8">' + APP_TAGS, 1)
     # the build's data, the match (match.js: window.__SF2_CONFIG) and the menu load before the game; the
     # game starts when the menu is done (__sf2Boot; at once when a match is set)
     html = html.replace("<script>", '<script src="sf2data.js"></script><script src="match.js"></script>'
@@ -3244,6 +3248,40 @@ def abilities_on_super(entries):
         e[1] = re.sub(r'<Move Name="[^"]+".*?</Move>', move, text, flags=re.S).encode("utf-8")
 
 
+# Titan's harpoon: its "hand" (a missile, TitansHarpoonMissile) holds on to the enemy until the enemy starts
+# TitansHarpoonStrikeFall or the round ends (trigger DeleteTitansHand). The game's Titan cannot be stopped
+# while throwing it (MOD_TITAN, TitanUnhittable); a player's Titan can (e.g. Tenebris's Fear Ray): the hand
+# then stays on the enemy for the rest of the round, and the knocked-down Titan spins on it. Added: the hand
+# goes when its Titan is no longer in a harpoon move.
+TITAN_HAND = """<Trigger Name="DeleteTitansHandInterrupted">
+      <Events>
+        <EveryFrame />
+      </Events>
+      <Locks>
+        <Item Type="Skeleton" SubType="SkeletonMissile" />
+      </Locks>
+      <Conditions>
+        <Name Value="TitansHarpoonMissile" />
+        <CurrentAnimation Player="Parent" Name="TitansHarpoonPlayerStart" Not="1" />
+        <CurrentAnimation Player="Parent" Name="TitansHarpoonPlayerMiddle" Not="1" />
+        <CurrentAnimation Player="Parent" Name="TitansHarpoonPlayerStrike" Not="1" />
+      </Conditions>
+      <Actions>
+        <Delete Player="Me" />
+      </Actions>
+    </Trigger>
+    """
+
+
+def titan_hand(entries):
+    for e in entries:
+        if e[0] == "res/moves.xml":
+            text = e[1].decode("utf-8")
+            if text.count('<Trigger Name="DeleteTitansHand">') != 1:
+                sys.exit("moves.xml: trigger DeleteTitansHand not found once (game update?)")
+            e[1] = text.replace('<Trigger Name="DeleteTitansHand">', TITAN_HAND + '<Trigger Name="DeleteTitansHand">').encode("utf-8")
+
+
 def item_title(n):
     """a name for an item the game has no text for: MAGIC_ICE_PINS -> Ice Pins"""
     return re.sub(r"^(MAGIC|RANGED|WEAPON|HELM|ARMOR)_", "", n).replace("_", " ").title()
@@ -3364,9 +3402,10 @@ def normal_game(www, xml2_path, js_path):
             sys.exit(f"normal game: '{name}' found {js.count(find)} times in {os.path.basename(js_path)} (game update?)")
         js = js.replace(find, repl)
     html = open(os.path.join(www, "index.html"), encoding="utf-8").read()
-    if html.count(os.path.basename(js_path)) != 1 or "</head>" not in html:
+    if html.count(os.path.basename(js_path)) != 1 or "</head>" not in html or '<meta charset="utf-8">' not in html:
         sys.exit("normal game: index.html is not what the builder knows")
     html = html.replace(os.path.basename(js_path), "sf2.normal.js").replace("</head>", NORMAL_PANEL + "</head>", 1)
+    html = html.replace('<meta charset="utf-8">', '<meta charset="utf-8">' + APP_TAGS, 1)
     out = {"sf2.normal.js": js.encode("utf-8"), "normal.html": html.encode("utf-8")}
     for f in [xml2_path] + prof:
         out[os.path.join("res", other(f))] = open(f, "rb").read()
@@ -3378,6 +3417,7 @@ def build_game(www, out, entries, xml2_path):
     quests emptied, the all-items profile, every ability on Super), index.html, the portal config"""
     PROGRESS.stage(0, 3, "game data: items, moves, the all-items profile")
     abilities_on_super(entries)                      # first: the data below reads moves.xml
+    titan_hand(entries)
     level_items(entries)                             # and list.xml
     profile = all_items_profile(entries, www)
     for e in entries:
