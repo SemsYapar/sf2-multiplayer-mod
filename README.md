@@ -54,11 +54,17 @@ Open http://localhost:8080/ in Chrome or Edge. The menu has:
 In a free fight you pick the fighters, the place, the rounds and the game's own fight rules (darkness,
 earthquakes, ring-out ...). Every perk, enchantment and rule has a description with its numbers.
 
+Free fights are fair: every fighter has the same attack and defense, those of top-upgrade gear, and
+unarmed hits are as strong as weapon hits. Gear changes the look and the moves; enchantments work at full
+strength. What you add on top still counts: extra perks and the bonus of a full item set. Against the
+computer, the difficulty makes only the computer stronger or weaker.
+
 ### Your own fighter
 
 Tick **My own fighter** on your card, type a name and pick a picture. The first time you choose your
 gear and perk tree in the dojo; its fight button starts the match and saves them. From then on the
-fighter is ready without the dojo; tick **Change gear and perk tree in the dojo first** to change it.
+fighter is ready without the dojo. To change it, pick **Dojo first: change the gear, keep the perk tree**
+or **Dojo first: new perk tree (and gear)**: the dojo then shows your saved fighter.
 Your name and picture show on the VS screen.
 
 ### Sharing the game with other devices
@@ -79,9 +85,12 @@ and joins. The host can be a PC, the Android app, or a device that opened a shar
 then runs through the sharing device). Only the inputs travel; both devices run the same simulation.
 
 Each key press is used a few frames after it is pressed (the input delay, shown at the bottom of the
-screen), so it reaches the other device in time. The delay is set from the ping when the match starts
-and grows by a frame if the other device keeps waiting. A fixed value can be set with
+screen), so it reaches the other device in time. The delay is set from the ping when the match starts,
+grows by a frame if the other device keeps waiting, and shrinks again while the inputs arrive early. A fixed value can be set with
 `lan_input_delay` in the match JSON.
+
+Both devices must run the same build (built from the same mod and game files). If they do not, the
+match does not start and the bottom line says "different builds".
 
 ## Android app (optional)
 
